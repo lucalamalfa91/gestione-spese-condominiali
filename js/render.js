@@ -1,5 +1,5 @@
 import { viewMeta } from './config.js';
-import { periodLabel, periodSummary, totals, findPeriodByDate } from './fiscal.js';
+import { periodLabel, periodSummary, totals, findPeriodByDate, defaultFiscalLabel } from './fiscal.js';
 import { activeHouse, state } from './state.js';
 import { fmt, today } from './utils.js';
 
@@ -34,14 +34,17 @@ export function createRenderer(els) {
     if (existingId) els.paymentPeriod.value = existingId;
   }
 
-  function renderPeriodSelects(house) {
-    const current = findPeriodByDate(house, today);
-    const defaultId = current.id || house.fiscalPeriods[0]?.id || '';
-    if (els.duePeriod) {
-      const dueHtml = periodOptions(house, defaultId)
-        || '<option value="">— creato al salvataggio —</option>';
-      els.duePeriod.innerHTML = dueHtml;
+  function renderDueFormDefaults(house) {
+    if (!els.duePeriodLabel) return;
+    const suggested = defaultFiscalLabel(house);
+    if (!els.duePeriodLabel.value) els.duePeriodLabel.placeholder = `es. ${suggested}`;
+    if (els.duePeriodHint) {
+      els.duePeriodHint.textContent = `Formato: ${suggested} (mese inizio ${house.fiscalStartMonth ?? 6})`;
     }
+  }
+
+  function renderPeriodSelects(house) {
+    renderDueFormDefaults(house);
     if (els.paymentDate) els.paymentDate.value ||= today;
     syncPaymentPeriodSelect(house);
   }
@@ -284,7 +287,8 @@ export function collectDom() {
     unlinkedMovements: document.getElementById('unlinkedMovements'),
     demoBtn: document.getElementById('demoBtn'),
     themeToggle: document.getElementById('themeToggle'),
-    duePeriod: document.getElementById('duePeriod'),
+    duePeriodLabel: document.getElementById('duePeriodLabel'),
+    duePeriodHint: document.getElementById('duePeriodHint'),
     paymentPeriod: document.getElementById('paymentPeriod'),
     paymentDate: document.getElementById('paymentDate'),
     paymentsTable: document.getElementById('paymentsTable'),

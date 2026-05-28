@@ -132,7 +132,7 @@
             <div class="panel-head"><div><h2>Nuovo dovuto</h2><p class="subtle">Registra quote per esercizio fiscale.</p></div></div>
             <form id="dueForm" class="stack">
               <div class="field-grid">
-                <div><label for="duePeriod">Esercizio fiscale</label><select id="duePeriod" name="fiscalPeriodId" required></select></div>
+                <div><label for="duePeriodLabel">Esercizio fiscale</label><input id="duePeriodLabel" name="fiscalPeriodLabel" type="text" inputmode="numeric" placeholder="es. 2024/2025" required /><p class="hint" id="duePeriodHint"></p></div>
                 <div><label for="dueAmount">Importo dovuto</label><input id="dueAmount" name="amount" type="number" min="0" step="0.01" required /></div>
               </div>
               <div><label for="dueDescription">Descrizione</label><input id="dueDescription" name="description" type="text" placeholder="Preventivo, saldo, conguaglio..." /></div>

@@ -1,7 +1,7 @@
 import { DEFAULT_SUPABASE_ANON_KEY, DEFAULT_SUPABASE_URL } from './config.js';
 import { legacyCalendarPeriod, periodFromLabel } from './backup.js';
 import { mapHouseFromDb, state } from './state.js';
-import { ensurePeriodPayload } from './fiscal.js';
+import { ensurePeriodPayload, parseFiscalLabel } from './fiscal.js';
 import { hashText, today, uid } from './utils.js';
 
 export function createSupabaseClient(createClient) {
@@ -98,6 +98,13 @@ export async function ensureFiscalPeriodBySpec(house, spec) {
   return period;
 }
 
+export async function ensureFiscalPeriodByLabel(house, labelText) {
+  const existing = house.fiscalPeriods.find(p => p.label === String(labelText).trim());
+  if (existing) return existing;
+  const spec = parseFiscalLabel(house, labelText);
+  return ensureFiscalPeriodBySpec(house, spec);
+}
+
 export async function ensureFiscalPeriod(house, dateStr) {
   const existing = house.fiscalPeriods.find(p => dateStr >= p.startDate && dateStr <= p.endDate);
   if (existing) return existing;
@@ -110,6 +117,10 @@ export async function ensureFiscalPeriod(house, dateStr) {
 export async function saveDueToSupabase(house, due) {
   await ensureAuthenticated();
   let periodId = due.fiscalPeriodId;
+  if (!periodId && due.fiscalPeriodLabel) {
+    const period = await ensureFiscalPeriodByLabel(house, due.fiscalPeriodLabel);
+    periodId = period.id;
+  }
   if (!periodId) {
     const period = await ensureFiscalPeriod(house, due.date || today);
     periodId = period.id;

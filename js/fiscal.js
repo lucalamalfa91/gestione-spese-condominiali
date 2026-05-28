@@ -1,4 +1,4 @@
-import { pad2, toIsoDate } from './utils.js';
+import { pad2, toIsoDate, today } from './utils.js';
 
 export function fiscalLabel(startYear, startMonth) {
   if (startMonth === 1) return String(startYear);
@@ -70,10 +70,38 @@ export function totals(house) {
   };
 }
 
+export function parseFiscalLabel(house, labelText) {
+  const label = String(labelText || '').trim();
+  if (!label) throw new Error('Inserisci l\'esercizio fiscale (es. 2024/2025).');
+
+  const split = label.match(/^(\d{4})\/(\d{4})$/);
+  if (split) {
+    const startYear = Number(split[1]);
+    const endYear = Number(split[2]);
+    if (endYear !== startYear + 1) {
+      throw new Error('Formato non valido: usa es. 2024/2025 (anno fine = anno inizio + 1).');
+    }
+    const bounds = periodBounds(startYear, house.fiscalStartMonth ?? 6);
+    return { ...bounds, label };
+  }
+
+  const single = label.match(/^(\d{4})$/);
+  if (single) {
+    const startYear = Number(single[1]);
+    const bounds = periodBounds(startYear, house.fiscalStartMonth ?? 6);
+    return bounds;
+  }
+
+  throw new Error('Formato esercizio non valido. Usa 2024/2025 oppure 2025.');
+}
+
+export function defaultFiscalLabel(house, dateStr = today) {
+  return findPeriodByDate(house, dateStr).label;
+}
+
 export function ensurePeriodPayload(house, dateStr) {
   const p = findPeriodByDate(house, dateStr);
   if (p.id) return { id: p.id, label: p.label, startDate: p.startDate, endDate: p.endDate };
   const startYear = startYearForDate(toIsoDate(dateStr), house.fiscalStartMonth);
-  const bounds = periodBounds(startYear, house.fiscalStartMonth);
-  return bounds;
+  return periodBounds(startYear, house.fiscalStartMonth);
 }

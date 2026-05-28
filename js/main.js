@@ -5,6 +5,7 @@ import {
   createSupabaseClient,
   deleteHouseRemote,
   ensureFiscalPeriod,
+  ensureFiscalPeriodByLabel,
   linkBankMovement,
   loadFromSupabase,
   saveBankImport,
@@ -197,17 +198,13 @@ els.dueForm.addEventListener('submit', async e => {
     await ensureHousePersisted(house);
     const fd = new FormData(els.dueForm);
     const due = createLocalDue(fd);
-    due.fiscalPeriodId = els.duePeriod.value;
+    due.fiscalPeriodLabel = String(fd.get('fiscalPeriodLabel') || els.duePeriodLabel?.value || '').trim();
     if (state.supabase && state.user) {
-      if (!due.fiscalPeriodId) {
-        const p = await ensureFiscalPeriod(house, today);
-        due.fiscalPeriodId = p.id;
-      }
       await saveDueToSupabase(house, due);
       els.dueForm.reset();
       await loadFromSupabase();
     } else {
-      house.dues.push({ ...due, id: uid('due'), fiscalPeriodId: els.duePeriod.value });
+      house.dues.push({ ...due, id: uid('due'), fiscalPeriodId: due.fiscalPeriodLabel });
     }
     render();
     setView('dashboard');
