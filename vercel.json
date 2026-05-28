@@ -1,6 +1,9 @@
 {
-  "cleanUrls": true,
   "rewrites": [
+    {
+      "source": "/",
+      "destination": "/gestione-spese-condominiali-supabase.html"
+    },
     {
       "source": "/(.*)",
       "destination": "/gestione-spese-condominiali-supabase.html"
