@@ -89,8 +89,6 @@
     .login-form label { display: block; font-size: var(--text-sm); margin-bottom: .35rem; color: var(--color-text-muted); }
     .login-error { padding: .75rem .9rem; border-radius: var(--radius-md); background: var(--color-error-highlight); color: var(--color-error); font-size: var(--text-sm); }
     .login-success { padding: .75rem .9rem; border-radius: var(--radius-md); background: var(--color-success-highlight); color: var(--color-success); font-size: var(--text-sm); }
-    .login-link { color: var(--color-primary); font-size: var(--text-sm); text-decoration: underline; text-underline-offset: 2px; }
-    .login-link:hover { color: var(--color-primary-hover); }
     .login-footer { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); }
     .btn[disabled] { opacity: .65; cursor: not-allowed; transform: none; }
     .user-chip { display: inline-flex; align-items: center; gap: .5rem; padding: .35rem .75rem; border-radius: var(--radius-full); background: var(--color-surface-offset); border: 1px solid rgba(0,0,0,.08); font-size: var(--text-sm); max-width: 240px; }
@@ -127,19 +125,8 @@
         </div>
         <button class="btn btn-primary" type="submit" id="loginSubmitBtn">Accedi</button>
       </form>
-      <form id="forgotForm" class="login-form hidden">
-        <div id="forgotError" class="login-error hidden" role="alert"></div>
-        <div id="forgotSuccess" class="login-success hidden" role="status"></div>
-        <div>
-          <label for="forgotEmail">Email</label>
-          <input id="forgotEmail" name="email" type="email" autocomplete="username" required placeholder="nome@email.it" />
-        </div>
-        <p class="muted">Riceverai un link per reimpostare la password.</p>
-        <button class="btn btn-primary" type="submit" id="forgotSubmitBtn">Invia link di reset</button>
-        <button class="btn btn-secondary" type="button" id="cancelForgotBtn">Annulla</button>
-      </form>
       <div class="login-footer">
-        <button class="login-link" type="button" id="forgotPasswordBtn">Password dimenticata?</button>
+        <span class="muted">Accesso riservato agli utenti registrati.</span>
         <button class="icon-btn" id="loginThemeToggle" aria-label="Cambia tema"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></button>
       </div>
     </div>
@@ -168,7 +155,7 @@
         <button class="btn btn-primary" type="submit" id="recoverySubmitBtn">Salva nuova password</button>
       </form>
       <div class="login-footer">
-        <span class="muted">Il link di reset scade dopo un periodo limitato.</span>
+        <span class="muted">Link di recupero inviato da Supabase.</span>
         <button class="icon-btn" id="recoveryThemeToggle" aria-label="Cambia tema"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></button>
       </div>
     </div>
@@ -188,6 +175,7 @@
         <button class="nav-btn" data-view="versamenti"><strong>Versamenti</strong><span>Pagamenti e storico</span></button>
         <button class="nav-btn" data-view="immobile"><strong>Immobile</strong><span>Dati casa e note</span></button>
         <button class="nav-btn" data-view="archivio"><strong>Archivio</strong><span>Import, export e backup</span></button>
+        <button class="nav-btn" data-view="account"><strong>Account</strong><span>Password e profilo</span></button>
       </nav>
 
       <div class="section-title">Immobili</div>
@@ -298,6 +286,32 @@
           </div>
         </div>
       </section>
+
+      <section class="view" data-view-panel="account">
+        <div class="forms">
+          <div class="card stack">
+            <div class="panel-head"><div><h2>Cambia password</h2><p class="subtle">Aggiorna la password del tuo account senza email.</p></div></div>
+            <form id="accountPasswordForm" class="stack">
+              <div id="accountPasswordError" class="login-error hidden" role="alert"></div>
+              <div id="accountPasswordSuccess" class="login-success hidden" role="status"></div>
+              <div>
+                <label for="accountPassword">Nuova password</label>
+                <input id="accountPassword" name="password" type="password" autocomplete="new-password" required minlength="6" placeholder="Minimo 6 caratteri" />
+              </div>
+              <div>
+                <label for="accountPasswordConfirm">Conferma password</label>
+                <input id="accountPasswordConfirm" name="passwordConfirm" type="password" autocomplete="new-password" required minlength="6" placeholder="Ripeti la password" />
+              </div>
+              <button class="btn btn-primary" type="submit" id="accountPasswordSubmitBtn">Salva password</button>
+            </form>
+          </div>
+          <div class="card stack">
+            <div class="panel-head"><div><h2>Profilo</h2><p class="subtle">Account connesso.</p></div></div>
+            <div class="mini-card"><div class="metric-label">Email</div><div id="accountEmail" class="metric-value" style="font-size:1.1rem;">—</div></div>
+            <p class="muted">Se non ricordi la password e non riesci ad accedere, chiedi il reset dal pannello Supabase (Authentication → Users → Send password recovery).</p>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -315,7 +329,8 @@
       annualita: ['Annualità', 'Dovuto, saldi e stato per anno'],
       versamenti: ['Versamenti', 'Inserimento e storico dei pagamenti'],
       immobile: ['Immobile', 'Dati della casa e gestione multi-casa'],
-      archivio: ['Archivio', 'Import, export e backup dati']
+      archivio: ['Archivio', 'Import, export e backup dati'],
+      account: ['Account', 'Password e profilo utente']
     };
 
     const state = {
@@ -335,23 +350,23 @@
       recoveryScreen: document.getElementById('recoveryScreen'),
       appShell: document.getElementById('appShell'),
       loginForm: document.getElementById('loginForm'),
-      forgotForm: document.getElementById('forgotForm'),
       recoveryForm: document.getElementById('recoveryForm'),
+      accountPasswordForm: document.getElementById('accountPasswordForm'),
       loginEmail: document.getElementById('loginEmail'),
       loginPassword: document.getElementById('loginPassword'),
-      forgotEmail: document.getElementById('forgotEmail'),
       recoveryPassword: document.getElementById('recoveryPassword'),
       recoveryPasswordConfirm: document.getElementById('recoveryPasswordConfirm'),
+      accountPassword: document.getElementById('accountPassword'),
+      accountPasswordConfirm: document.getElementById('accountPasswordConfirm'),
       loginSubmitBtn: document.getElementById('loginSubmitBtn'),
-      forgotSubmitBtn: document.getElementById('forgotSubmitBtn'),
       recoverySubmitBtn: document.getElementById('recoverySubmitBtn'),
-      forgotPasswordBtn: document.getElementById('forgotPasswordBtn'),
-      cancelForgotBtn: document.getElementById('cancelForgotBtn'),
+      accountPasswordSubmitBtn: document.getElementById('accountPasswordSubmitBtn'),
       loginError: document.getElementById('loginError'),
-      forgotError: document.getElementById('forgotError'),
-      forgotSuccess: document.getElementById('forgotSuccess'),
       recoveryError: document.getElementById('recoveryError'),
       recoverySuccess: document.getElementById('recoverySuccess'),
+      accountPasswordError: document.getElementById('accountPasswordError'),
+      accountPasswordSuccess: document.getElementById('accountPasswordSuccess'),
+      accountEmail: document.getElementById('accountEmail'),
       recoverySubtitle: document.getElementById('recoverySubtitle'),
       loginThemeToggle: document.getElementById('loginThemeToggle'),
       recoveryThemeToggle: document.getElementById('recoveryThemeToggle'),
@@ -369,7 +384,15 @@
     function fmt(v) { return currency.format(Number(v || 0)); }
     function activeHouse() { return state.data.houses.find(h => h.id === state.selectedHouseId) || null; }
     function setTheme(theme) { state.theme = theme; document.documentElement.setAttribute('data-theme', theme); }
-    function setView(view) { state.currentView = view; els.navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.view === view)); els.viewPanels.forEach(panel => panel.classList.toggle('active', panel.dataset.viewPanel === view)); els.viewTitle.textContent = viewMeta[view][0]; els.viewSubtitle.textContent = viewMeta[view][1]; if (window.innerWidth <= 860) els.sidebar.classList.remove('open'); }
+    function setView(view) {
+      state.currentView = view;
+      els.navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.view === view));
+      els.viewPanels.forEach(panel => panel.classList.toggle('active', panel.dataset.viewPanel === view));
+      els.viewTitle.textContent = viewMeta[view][0];
+      els.viewSubtitle.textContent = viewMeta[view][1];
+      if (view === 'account') renderAccountView();
+      if (window.innerWidth <= 860) els.sidebar.classList.remove('open');
+    }
     function setStatus(message) {
       els.authStatus.textContent = message;
       els.userChip.title = message;
@@ -386,14 +409,10 @@
     }
 
     function showLoginError(message) { showAuthMessage(els.loginError, message); }
-    function showForgotError(message) { showAuthMessage(els.forgotError, message); }
-    function showForgotSuccess(message) { showAuthMessage(els.forgotSuccess, message); }
     function showRecoveryError(message) { showAuthMessage(els.recoveryError, message); }
     function showRecoverySuccess(message) { showAuthMessage(els.recoverySuccess, message); }
-
-    function getRedirectUrl() {
-      return `${window.location.origin}${window.location.pathname}`;
-    }
+    function showAccountPasswordError(message) { showAuthMessage(els.accountPasswordError, message); }
+    function showAccountPasswordSuccess(message) { showAuthMessage(els.accountPasswordSuccess, message); }
 
     function isRecoveryUrl() {
       const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
@@ -406,16 +425,19 @@
       history.replaceState(null, '', window.location.pathname);
     }
 
-    function showForgotPasswordView(show) {
-      els.loginForm.classList.toggle('hidden', show);
-      els.forgotForm.classList.toggle('hidden', !show);
-      els.forgotPasswordBtn.classList.toggle('hidden', show);
-      if (show) {
-        showLoginError('');
-        showForgotError('');
-        showForgotSuccess('');
-        els.forgotEmail.value = els.loginEmail.value.trim();
-      }
+    function validatePasswordPair(password, confirm) {
+      if (password.length < 6) throw new Error('La password deve avere almeno 6 caratteri');
+      if (password !== confirm) throw new Error('Le password non coincidono');
+    }
+
+    async function applyNewPassword(password, confirm) {
+      validatePasswordPair(password, confirm);
+      const { error } = await state.supabase.auth.updateUser({ password });
+      if (error) throw error;
+    }
+
+    function renderAccountView() {
+      els.accountEmail.textContent = state.user?.email || '—';
     }
 
     function showRecoveryUI(show) {
@@ -441,18 +463,18 @@
       els.loginPassword.disabled = isLoading;
     }
 
-    function setForgotLoading(isLoading) {
-      els.forgotSubmitBtn.disabled = isLoading;
-      els.forgotSubmitBtn.textContent = isLoading ? 'Invio in corso...' : 'Invia link di reset';
-      els.forgotEmail.disabled = isLoading;
-      els.cancelForgotBtn.disabled = isLoading;
-    }
-
     function setRecoveryLoading(isLoading) {
       els.recoverySubmitBtn.disabled = isLoading;
       els.recoverySubmitBtn.textContent = isLoading ? 'Salvataggio...' : 'Salva nuova password';
       els.recoveryPassword.disabled = isLoading;
       els.recoveryPasswordConfirm.disabled = isLoading;
+    }
+
+    function setAccountPasswordLoading(isLoading) {
+      els.accountPasswordSubmitBtn.disabled = isLoading;
+      els.accountPasswordSubmitBtn.textContent = isLoading ? 'Salvataggio...' : 'Salva password';
+      els.accountPassword.disabled = isLoading;
+      els.accountPasswordConfirm.disabled = isLoading;
     }
 
     function setAuthUI(isAuthenticated) {
@@ -558,54 +580,19 @@
       state.recoveryMode = false;
       state.data = { houses: [] };
       state.selectedHouseId = null;
-      showForgotPasswordView(false);
       setAuthUI(false);
       showLoginError('');
       render();
     }
 
-    async function sendPasswordReset(event) {
-      event.preventDefault();
-      showForgotError('');
-      showForgotSuccess('');
-      setForgotLoading(true);
-      try {
-        if (!state.supabase) createSupabaseClient();
-        const email = els.forgotEmail.value.trim();
-        if (!email) throw new Error('Inserisci la tua email');
-        const { error } = await state.supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: getRedirectUrl()
-        });
-        if (error) throw error;
-        els.loginEmail.value = email;
-        saveStoredConfig();
-        showForgotSuccess('Link inviato. Controlla la casella email (anche spam).');
-      } catch (err) {
-        showForgotError(err.message || 'Impossibile inviare il link di reset');
-      } finally {
-        setForgotLoading(false);
-      }
-    }
-
-    async function updatePassword(event) {
+    async function updatePasswordFromRecovery(event) {
       event.preventDefault();
       showRecoveryError('');
       showRecoverySuccess('');
-      const password = els.recoveryPassword.value;
-      const confirm = els.recoveryPasswordConfirm.value;
-      if (password.length < 6) {
-        showRecoveryError('La password deve avere almeno 6 caratteri');
-        return;
-      }
-      if (password !== confirm) {
-        showRecoveryError('Le password non coincidono');
-        return;
-      }
       setRecoveryLoading(true);
       try {
         if (!state.supabase) createSupabaseClient();
-        const { error } = await state.supabase.auth.updateUser({ password });
-        if (error) throw error;
+        await applyNewPassword(els.recoveryPassword.value, els.recoveryPasswordConfirm.value);
         state.recoveryMode = false;
         clearAuthParamsFromUrl();
         showRecoverySuccess('Password aggiornata. Accesso in corso...');
@@ -614,7 +601,8 @@
         if (state.user) {
           setStatus(state.user.email);
           setAuthUI(true);
-          setView('dashboard');
+          setView('account');
+          renderAccountView();
           await loadFromSupabase();
         }
       } catch (err) {
@@ -624,8 +612,39 @@
       }
     }
 
+    async function updatePasswordFromAccount(event) {
+      event.preventDefault();
+      showAccountPasswordError('');
+      showAccountPasswordSuccess('');
+      setAccountPasswordLoading(true);
+      try {
+        if (!state.user) throw new Error('Devi essere connesso');
+        await applyNewPassword(els.accountPassword.value, els.accountPasswordConfirm.value);
+        els.accountPasswordForm.reset();
+        showAccountPasswordSuccess('Password aggiornata con successo.');
+      } catch (err) {
+        showAccountPasswordError(err.message || 'Impossibile aggiornare la password');
+      } finally {
+        setAccountPasswordLoading(false);
+      }
+    }
+
+    async function ensureAuthenticated() {
+      if (!state.supabase) createSupabaseClient();
+      if (state.user) return state.user;
+      const { data, error } = await state.supabase.auth.getSession();
+      if (error) throw error;
+      state.user = data.session?.user ?? null;
+      return state.user;
+    }
+
+    function scheduleLoadFromSupabase() {
+      queueMicrotask(() => { void loadFromSupabase(); });
+    }
+
     async function loadFromSupabase() {
-      if (!state.supabase || !state.user) return;
+      const user = await ensureAuthenticated();
+      if (!user) return;
       const { data: houses, error } = await state.supabase.from('houses').select('*').order('created_at', { ascending: true });
       if (error) { alert(error.message); return; }
       const mapped = [];
@@ -642,8 +661,9 @@
     }
 
     async function saveHouseToSupabase(house) {
-      if (!state.supabase || !state.user) return;
-      const payload = { name: house.name, location: house.location, notes: house.notes, user_id: state.user.id };
+      const user = await ensureAuthenticated();
+      if (!user) throw new Error('Devi essere connesso per salvare la casa');
+      const payload = { name: house.name, location: house.location, notes: house.notes, user_id: user.id };
       const numericId = Number(house.id);
       if (Number.isFinite(numericId)) {
         const { error } = await state.supabase.from('houses').update(payload).eq('id', numericId);
@@ -656,19 +676,19 @@
     }
 
     async function saveDueToSupabase(houseId, due) {
-      if (!state.supabase || !state.user) return;
+      if (!(await ensureAuthenticated())) return;
       const { error } = await state.supabase.from('dues').insert({ house_id: Number(houseId), year: due.year, amount: due.amount, description: due.description });
       if (error) throw error;
     }
 
     async function savePaymentToSupabase(houseId, payment) {
-      if (!state.supabase || !state.user) return;
+      if (!(await ensureAuthenticated())) return;
       const { error } = await state.supabase.from('payments').insert({ house_id: Number(houseId), year: payment.year, amount: payment.amount, date: payment.date, method: payment.method });
       if (error) throw error;
     }
 
     async function deleteHouseRemote(houseId) {
-      if (!state.supabase || !state.user) return;
+      if (!(await ensureAuthenticated())) return;
       const { error } = await state.supabase.from('houses').delete().eq('id', Number(houseId));
       if (error) throw error;
     }
@@ -709,10 +729,8 @@
     function loadDemo() { state.data = { houses: [{ id: uid('house'), name: 'Appartamento Milano', location: 'Milano', notes: 'Scala B · interno 6', dues: [{ id: uid('due'), year: 2024, amount: 1250, description: 'Preventivo ordinario', date: '2024-01-10' }, { id: uid('due'), year: 2025, amount: 1380, description: 'Preventivo ordinario', date: '2025-01-12' }], payments: [{ id: uid('pay'), year: 2024, amount: 1300, date: '2024-06-15', method: 'Bonifico' }] }, { id: uid('house'), name: 'Casa Lago', location: 'Lecco', notes: 'Seconda casa', dues: [{ id: uid('due'), year: 2026, amount: 1100, description: 'Spese ordinarie', date: '2026-02-04' }], payments: [{ id: uid('pay'), year: 2026, amount: 300, date: '2026-03-10', method: 'Bonifico' }] }] }; state.selectedHouseId = state.data.houses[0].id; render(); }
 
     els.loginForm.addEventListener('submit', signIn);
-    els.forgotForm.addEventListener('submit', sendPasswordReset);
-    els.recoveryForm.addEventListener('submit', updatePassword);
-    els.forgotPasswordBtn.addEventListener('click', () => showForgotPasswordView(true));
-    els.cancelForgotBtn.addEventListener('click', () => showForgotPasswordView(false));
+    els.recoveryForm.addEventListener('submit', updatePasswordFromRecovery);
+    els.accountPasswordForm.addEventListener('submit', updatePasswordFromAccount);
     els.addHouseBtn.addEventListener('click', addHouse);
     els.exportBtn.addEventListener('click', exportJson);
     els.importFile.addEventListener('change', e => importJson(e.target.files[0]));
@@ -763,19 +781,21 @@
         createSupabaseClient();
         if (await handleAuthCallbackError()) return;
 
-        state.supabase.auth.onAuthStateChange(async (event, session) => {
+        state.supabase.auth.onAuthStateChange((event, session) => {
           if (event === 'PASSWORD_RECOVERY') {
-            state.user = session?.user || null;
+            state.user = session?.user ?? null;
             showRecoveryUI(true);
             clearAuthParamsFromUrl();
             return;
           }
           if (state.recoveryMode) return;
-          state.user = session?.user || null;
+          if (event === 'INITIAL_SESSION') return;
+
+          state.user = session?.user ?? null;
           if (state.user) {
             setStatus(state.user.email);
             setAuthUI(true);
-            await loadFromSupabase();
+            scheduleLoadFromSupabase();
           } else {
             state.data = { houses: [] };
             state.selectedHouseId = null;
