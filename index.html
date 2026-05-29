@@ -130,9 +130,9 @@
         </div>
         <section class="cards" id="metrics"></section>
         <section class="grid-2">
-          <div class="panel">
+          <div class="panel data-panel">
             <div class="panel-head"><div><h2>Riepilogo annualità</h2><p class="subtle">Preventivo, consuntivo e saldi per esercizio.</p></div><select id="periodFilter" aria-label="Filtra esercizio"><option value="all">Tutti</option></select></div>
-            <div class="table-scroll" id="annualTableWrap"></div>
+            <div class="data-table-wrap panel-table-wrap" id="annualTableWrap"></div>
           </div>
           <div class="panel">
             <div class="panel-head"><div><h2>Scadenzario sintetico</h2><p class="subtle">Saldi aperti o in eccedenza.</p></div></div>
@@ -141,7 +141,7 @@
         </section>
         <section class="panel dashboard-payments-panel">
           <div class="panel-head"><div><h2>Versamenti</h2><p class="subtle">Pagamenti nel contesto del filtro esercizio sopra.</p></div></div>
-          <div class="table-scroll dashboard-payments-scroll" id="dashboardPayments"></div>
+          <div class="data-table-wrap dashboard-payments-scroll" id="dashboardPayments"></div>
         </section>
       </section>
 
@@ -153,9 +153,9 @@
           <button class="sub-nav-btn" type="button" role="tab" data-view="movimenti" data-subview="situazione" aria-selected="false">Situazione</button>
         </nav>
         <div class="subview active" data-subview-panel="dovuti" role="tabpanel">
-          <div class="forms">
-            <div class="card stack">
-              <div class="panel-head"><div><h2>Nuovo dovuto</h2><p class="subtle">Registra quote per esercizio fiscale.</p></div></div>
+          <div class="split-layout">
+            <aside class="split-form-pane card stack">
+              <div class="panel-head"><div><h2>Nuovo dovuto</h2><p class="subtle">Preventivo o consuntivo per esercizio.</p></div></div>
               <form id="dueForm" class="stack">
                 <div class="field-grid">
                   <div><label for="duePeriodLabel">Esercizio fiscale</label><input id="duePeriodLabel" name="fiscalPeriodLabel" type="text" inputmode="numeric" placeholder="es. 2024/2025" required /><p class="hint" id="duePeriodHint"></p></div>
@@ -173,13 +173,16 @@
                   <button class="btn btn-secondary hidden" id="dueFormCancel" type="button">Annulla modifica</button>
                 </div>
               </form>
-            </div>
-            <div class="card"><div class="panel-head"><div><h2>Dovuti registrati</h2><p class="subtle">Modifica o elimina le quote per esercizio.</p></div></div><div class="table-scroll" id="duesTable"></div></div>
+            </aside>
+            <section class="split-content-pane card stack data-panel">
+              <div class="panel-head"><div><h2>Dovuti registrati</h2><p class="subtle">Elenco per esercizio — scorri se necessario.</p></div></div>
+              <div class="data-table-wrap" id="duesTable"></div>
+            </section>
           </div>
         </div>
         <div class="subview" data-subview-panel="versamenti" role="tabpanel">
-          <div class="versamenti-layout">
-            <aside class="versamenti-form-pane card stack">
+          <div class="split-layout versamenti-layout">
+            <aside class="split-form-pane versamenti-form-pane card stack">
               <div class="panel-head"><div><h2>Nuovo versamento</h2><p class="subtle">Registra un pagamento o un riporto (importo negativo).</p></div></div>
               <form id="paymentForm" class="stack">
                 <div class="field-grid">
@@ -198,30 +201,35 @@
                 </div>
               </form>
             </aside>
-            <section class="versamenti-list-pane card stack">
+            <section class="split-content-pane versamenti-list-pane card stack data-panel">
               <div class="panel-head"><div><h2>Storico versamenti</h2><p class="subtle">Filtro sulla data rata; in tabella anche la data versamento.</p></div></div>
               <div class="payments-toolbar field-grid">
                 <div><label for="paymentFilterYear">Anno rata</label><select id="paymentFilterYear"><option value="">Tutti</option></select></div>
                 <div><label for="paymentFilterMonth">Mese rata</label><select id="paymentFilterMonth"><option value="">Tutti</option></select></div>
               </div>
               <div class="payments-summary" id="paymentsSummary" aria-live="polite"></div>
-              <div class="table-scroll versamenti-table-scroll" id="paymentsTable"></div>
+              <div class="data-table-wrap versamenti-table-scroll" id="paymentsTable"></div>
             </section>
           </div>
         </div>
         <div class="subview" data-subview-panel="import" role="tabpanel">
-          <div class="forms">
-            <div class="card stack">
+          <div class="split-layout">
+            <aside class="split-form-pane card stack">
               <div class="panel-head"><div><h2>Import Excel Banca Intesa</h2><p class="subtle">Formato export &quot;Lista Operazioni&quot;.</p></div></div>
               <label class="btn btn-secondary" for="bankImportFile">Carica file Excel</label>
               <input class="file-input" id="bankImportFile" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" />
               <p class="muted">I movimenti con match incerto restano non associati fino a conferma manuale.</p>
               <button class="btn btn-primary" id="bankImportConfirm" type="button">Conferma import selezionati</button>
-              <div class="table-scroll" id="bankImportPreview"></div>
-            </div>
-            <div class="card stack">
-              <div class="panel-head"><div><h2>Da associare manualmente</h2><p class="subtle">Movimenti importati senza esercizio fiscale.</p></div></div>
-              <div class="table-scroll" id="unlinkedMovements"></div>
+            </aside>
+            <div class="split-content-pane import-stack">
+              <section class="card stack data-panel">
+                <div class="panel-head"><div><h2>Anteprima import</h2><p class="subtle">Seleziona i movimenti da registrare.</p></div></div>
+                <div class="data-table-wrap" id="bankImportPreview"></div>
+              </section>
+              <section class="card stack data-panel">
+                <div class="panel-head"><div><h2>Da associare manualmente</h2><p class="subtle">Movimenti senza esercizio fiscale.</p></div></div>
+                <div class="data-table-wrap" id="unlinkedMovements"></div>
+              </section>
             </div>
           </div>
         </div>
@@ -258,7 +266,10 @@
           </div>
         </div>
         <div class="subview" data-subview-panel="registro" role="tabpanel">
-          <div class="card"><div class="panel-head"><div><h2>Registro movimenti</h2><p class="subtle">Dovuti e versamenti della casa selezionata.</p></div></div><div class="table-scroll" id="movements"></div></div>
+          <div class="card data-panel">
+            <div class="panel-head"><div><h2>Registro movimenti</h2><p class="subtle">Dovuti e versamenti della casa selezionata.</p></div></div>
+            <div class="data-table-wrap panel-table-wrap" id="movements"></div>
+          </div>
         </div>
       </section>
 
@@ -268,15 +279,15 @@
           <button class="sub-nav-btn" type="button" role="tab" data-view="impostazioni" data-subview="account" aria-selected="false">Account</button>
         </nav>
         <div class="subview active" data-subview-panel="casa" role="tabpanel">
-          <div class="forms house-manage-layout">
-            <div class="card stack">
+          <div class="split-layout house-manage-layout">
+            <aside class="split-form-pane card stack data-panel">
               <div class="panel-head">
                 <div><h2>I tuoi immobili</h2><p class="subtle">Seleziona una casa da modificare o eliminare.</p></div>
                 <button class="btn btn-secondary" id="addHouseSettingsBtn" type="button">+ Nuova casa</button>
               </div>
-              <div id="housesManageList" class="house-list compact"></div>
-            </div>
-            <div class="card stack">
+              <div class="house-list-scroll"><div id="housesManageList" class="house-list compact"></div></div>
+            </aside>
+            <section class="split-content-pane card stack">
               <div class="panel-head"><div><h2 id="houseFormTitle">Modifica immobile</h2><p class="subtle" id="houseFormSubtitle">Dati e configurazione esercizio fiscale.</p></div></div>
               <form id="houseForm" class="stack">
                 <div class="field-grid">
@@ -299,11 +310,11 @@
                   <button class="btn btn-danger" id="deleteHouseBtn" type="button">Elimina casa</button>
                 </div>
               </form>
-            </div>
+            </section>
           </div>
         </div>
         <div class="subview" data-subview-panel="account" role="tabpanel">
-          <div class="forms">
+          <div class="stack-single">
             <div class="card stack">
               <div class="panel-head"><div><h2>Cambia password</h2><p class="subtle">Aggiorna la password del tuo account.</p></div></div>
               <form id="accountPasswordForm" class="stack">

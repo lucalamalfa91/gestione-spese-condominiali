@@ -391,7 +391,7 @@ export function createRenderer(els) {
       ).join('');
       return `<tr><td>${slot.label}</td><td>${slot.dueDescription || '—'}</td><td class="amount">${fmt(slot.amountDue)}</td><td class="amount">${fmt(slot.paid)}</td><td class="amount ${balCls}">${fmt(slot.balance)}</td></tr>${payRows}`;
     }).join('');
-    return `<div class="situazione-section"><h3 class="situazione-section-title">Preventivo — dettaglio rate</h3><div class="table-scroll"><table><thead><tr><th>Rata</th><th>Voce</th><th>Dovuto</th><th>Versato</th><th>Saldo</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+    return `<div class="situazione-section"><h3 class="situazione-section-title">Preventivo — dettaglio rate</h3><div class="data-table-wrap"><table><thead><tr><th>Rata</th><th>Voce</th><th>Dovuto</th><th>Versato</th><th>Saldo</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
   }
 
   function renderConsuntivoSection(report, totalsRow) {
@@ -401,7 +401,7 @@ export function createRenderer(els) {
     ).join('');
     const b = totalsRow?.balanceConsuntivo ?? 0;
     const balCls = b >= 0 ? 'positive' : 'negative';
-    return `<div class="situazione-section"><h3 class="situazione-section-title">Consuntivo</h3><div class="table-scroll"><table><thead><tr><th>Descrizione</th><th>Importo</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th>Totale consuntivo</th><td class="amount">${fmt(report.consuntivoTotal)}</td></tr><tr><th>Saldo (versato − consuntivo)</th><td class="amount ${balCls}">${fmt(b)}</td></tr></tfoot></table></div></div>`;
+    return `<div class="situazione-section"><h3 class="situazione-section-title">Consuntivo</h3><div class="data-table-wrap"><table><thead><tr><th>Descrizione</th><th>Importo</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th>Totale consuntivo</th><td class="amount">${fmt(report.consuntivoTotal)}</td></tr><tr><th>Saldo (versato − consuntivo)</th><td class="amount ${balCls}">${fmt(b)}</td></tr></tfoot></table></div></div>`;
   }
 
   function renderCarrySection(house, carryDues) {
@@ -410,7 +410,7 @@ export function createRenderer(els) {
       const amtCls = Number(d.amount) < 0 ? 'negative' : '';
       return `<tr><td>${d.description || 'Riporto'}</td><td>${carryFromLabel(house, d)}</td><td class="amount ${amtCls}">${fmt(d.amount)}</td></tr>`;
     }).join('');
-    return `<div class="situazione-section"><h3 class="situazione-section-title">Riporti su preventivo</h3><div class="table-scroll"><table><thead><tr><th>Descrizione</th><th>Da esercizio</th><th>Importo</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    return `<div class="situazione-section"><h3 class="situazione-section-title">Riporti su preventivo</h3><div class="data-table-wrap"><table><thead><tr><th>Descrizione</th><th>Da esercizio</th><th>Importo</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
 
   function renderUnlinkedSection(unlinked) {
@@ -419,7 +419,7 @@ export function createRenderer(els) {
       const cls = Number(p.amount) >= 0 ? 'positive' : 'negative';
       return `<tr><td>${p.date || '—'}</td><td>${p.method || '—'}</td><td class="amount ${cls}">${fmt(p.amount)}</td></tr>`;
     }).join('');
-    return `<div class="situazione-section"><h3 class="situazione-section-title">Versamenti senza rata</h3><div class="table-scroll"><table><thead><tr><th>Data vers.</th><th>Metodo</th><th>Importo</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    return `<div class="situazione-section"><h3 class="situazione-section-title">Versamenti senza rata</h3><div class="data-table-wrap"><table><thead><tr><th>Data vers.</th><th>Metodo</th><th>Importo</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
 
   function renderSituazione(house) {
