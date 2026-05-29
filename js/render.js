@@ -9,7 +9,15 @@ import {
   listAllInstallments,
   paymentsSummaryForList
 } from './installments.js';
-import { buildSituazioneReport, carryFromLabel, situazioneStatusLabel } from './situazione-report.js';
+import {
+  buildSituazioneReport,
+  carryFromLabel,
+  defaultSituazionePdfKind,
+  hasConsuntivoReport,
+  hasPreventivoReport,
+  resolveSituazionePdfKind,
+  situazioneStatusLabel
+} from './situazione-report.js';
 import { activeHouse, state } from './state.js';
 import { fmt, today } from './utils.js';
 
@@ -422,6 +430,19 @@ export function createRenderer(els) {
     return `<div class="situazione-section"><h3 class="situazione-section-title">Versamenti senza rata</h3><div class="data-table-wrap"><table><thead><tr><th>Data vers.</th><th>Metodo</th><th>Importo</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
 
+  function syncSituazionePdfKind(house, periodId) {
+    if (!els.situazionePdfKind) return;
+    const report = buildSituazioneReport(house, periodId);
+    const hasCons = hasConsuntivoReport(report);
+    const hasPrev = hasPreventivoReport(report);
+    const both = hasCons && hasPrev;
+    els.situazionePdfKind.classList.toggle('hidden', !both);
+    els.situazionePdfBtn?.toggleAttribute('disabled', !hasCons && !hasPrev);
+
+    const resolved = resolveSituazionePdfKind(report, els.situazionePdfKind.value);
+    els.situazionePdfKind.value = resolved || defaultSituazionePdfKind(report) || 'consuntivo';
+  }
+
   function renderSituazione(house) {
     if (!els.situazioneSections || !els.situazionePeriod) return;
     const summary = periodSummary(house);
@@ -429,6 +450,8 @@ export function createRenderer(els) {
       els.situazionePeriod.innerHTML = '';
       if (els.situazioneSummary) els.situazioneSummary.innerHTML = '';
       els.situazioneSections.innerHTML = '<div class="empty">Nessun esercizio registrato.</div>';
+      els.situazionePdfKind?.classList.add('hidden');
+      els.situazionePdfBtn?.setAttribute('disabled', '');
       return;
     }
     const current = els.situazionePeriod.value;
@@ -440,7 +463,8 @@ export function createRenderer(els) {
 
     const report = buildSituazioneReport(house, periodId);
     const totalsRow = report.totalsRow;
-    if (!report.slots.length && !report.consuntivoTotal && !report.preventivoDues.length) {
+    syncSituazionePdfKind(house, periodId);
+    if (!hasConsuntivoReport(report) && !hasPreventivoReport(report)) {
       if (els.situazioneSummary) els.situazioneSummary.innerHTML = '';
       els.situazioneSections.innerHTML = '<div class="empty">Nessun preventivo/consuntivo per questo esercizio.</div>';
       return;
@@ -682,6 +706,7 @@ export function collectDom() {
     situazioneSummary: document.getElementById('situazioneSummary'),
     situazioneSections: document.getElementById('situazioneSections'),
     situazionePdfBtn: document.getElementById('situazionePdfBtn'),
+    situazionePdfKind: document.getElementById('situazionePdfKind'),
     dueSplitMode: document.getElementById('dueSplitMode'),
     dueSplitCustom: document.getElementById('dueSplitCustom'),
     dueSplitCustomWrap: document.getElementById('dueSplitCustomWrap'),

@@ -44,3 +44,27 @@ export function carryFromLabel(house, due) {
   if (!due.carryFromPeriodId) return '';
   return periodLabel(house, due.carryFromPeriodId);
 }
+
+export function hasConsuntivoReport(report) {
+  return Boolean(report?.consuntivoDues?.length || report?.consuntivoTotal);
+}
+
+export function hasPreventivoReport(report) {
+  return Boolean(report?.slots?.length || report?.preventivoDues?.length);
+}
+
+/** Default PDF: consuntivo se presente, altrimenti preventivo. */
+export function defaultSituazionePdfKind(report) {
+  if (hasConsuntivoReport(report)) return 'consuntivo';
+  if (hasPreventivoReport(report)) return 'preventivo';
+  return null;
+}
+
+export function resolveSituazionePdfKind(report, requestedKind) {
+  const hasCons = hasConsuntivoReport(report);
+  const hasPrev = hasPreventivoReport(report);
+  if (!hasCons && !hasPrev) return null;
+  if (requestedKind === 'consuntivo' && hasCons) return 'consuntivo';
+  if (requestedKind === 'preventivo' && hasPrev) return 'preventivo';
+  return defaultSituazionePdfKind(report);
+}
