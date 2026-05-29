@@ -1,7 +1,23 @@
 import { resolveView, viewHeading, viewMeta } from './config.js';
-import { periodLabel, periodSummary, totals, findPeriodByDate, defaultFiscalLabel } from './fiscal.js';
+import { DUE_KINDS, periodLabel, periodSummary, totals, findPeriodByDate, defaultFiscalLabel } from './fiscal.js';
+import {
+  SPLIT_MODES,
+  filterPaymentsByInstallmentPeriod,
+  inferInstallmentKey,
+  installmentShortLabel,
+  listInstallmentsForPeriod,
+  listAllInstallments,
+  paymentsSummaryForList
+} from './installments.js';
+import { buildSituazioneReport, carryFromLabel, situazioneStatusLabel } from './situazione-report.js';
 import { activeHouse, state } from './state.js';
 import { fmt, today } from './utils.js';
+
+const MONTH_FILTER_LABELS = [
+  ['', 'Tutti'], ['1', 'Gennaio'], ['2', 'Febbraio'], ['3', 'Marzo'], ['4', 'Aprile'],
+  ['5', 'Maggio'], ['6', 'Giugno'], ['7', 'Luglio'], ['8', 'Agosto'], ['9', 'Settembre'],
+  ['10', 'Ottobre'], ['11', 'Novembre'], ['12', 'Dicembre']
+];
 
 function rowActions(kind, id) {
   return `<div class="row-actions"><button type="button" class="btn btn-secondary edit-${kind}" data-id="${id}">Modifica</button><button type="button" class="btn btn-secondary delete-${kind}" data-id="${id}">Elimina</button></div>`;
@@ -103,7 +119,7 @@ export function createRenderer(els) {
       btn.type = 'button';
       btn.className = `house-btn ${h.id === state.selectedHouseId && state.houseFormMode === 'edit' ? 'active' : ''}`;
       btn.dataset.houseId = h.id;
-      btn.innerHTML = `<strong>${h.name}</strong><span class="muted">${h.location || 'Località non indicata'}</span><span class="muted">Saldo: ${fmt(t.balance)}</span>`;
+      btn.innerHTML = `<strong>${h.name}</strong><span class="muted">${h.location || 'Località non indicata'}</span><span class="muted">Saldo cons.: ${fmt(t.balanceConsuntivo)}</span>`;
       els.housesManageList.appendChild(btn);
     }
   }
@@ -146,6 +162,61 @@ export function createRenderer(els) {
     if (!html) html = '<option value="">— registra un dovuto o importa movimenti —</option>';
     els.paymentPeriod.innerHTML = html;
     if (existingId) els.paymentPeriod.value = existingId;
+    syncPaymentInstallmentSelect(house);
+  }
+
+  function syncPaymentInstallmentSelect(house, preferredKey = null) {
+    if (!els.paymentInstallment || !els.paymentPeriod) return;
+    const periodId = els.paymentPeriod.value;
+    const slots = periodId ? listInstallmentsForPeriod(house, periodId) : listAllInstallments(house);
+    if (!slots.length) {
+      els.paymentInstallment.innerHTML = '<option value="">— registra un dovuto per l’esercizio —</option>';
+      return;
+    }
+    const date = els.paymentDate?.value || today;
+    let selected = preferredKey || els.paymentInstallment.value;
+    if (!selected) {
+      const match = slots.find(s => date >= s.periodStart && date <= s.periodEnd);
+      selected = match?.key || slots[0].key;
+    }
+    els.paymentInstallment.innerHTML = slots.map(s =>
+      `<option value="${s.key}" ${s.key === selected ? 'selected' : ''}>${s.label}${s.dueDescription ? ` · ${s.dueDescription}` : ''} (${fmt(s.amountDue)})</option>`
+    ).join('');
+  }
+
+  function renderPaymentFilterOptions(house) {
+    if (!els.paymentFilterYear || !els.paymentFilterMonth) return;
+    const years = new Set();
+    for (const slot of listAllInstallments(house)) {
+      years.add(Number(slot.periodStart.slice(0, 4)));
+    }
+    const yCur = els.paymentFilterYear.value;
+    const mCur = els.paymentFilterMonth.value;
+    els.paymentFilterYear.innerHTML = '<option value="">Tutti</option>' + [...years].sort((a, b) => b - a).map(y =>
+      `<option value="${y}" ${String(y) === yCur ? 'selected' : ''}>${y}</option>`
+    ).join('');
+    els.paymentFilterMonth.innerHTML = MONTH_FILTER_LABELS.map(([v, label]) =>
+      `<option value="${v}" ${v === mCur ? 'selected' : ''}>${label}</option>`
+    ).join('');
+  }
+
+  function getFilteredPayments(house) {
+    const year = els.paymentFilterYear?.value || '';
+    const month = els.paymentFilterMonth?.value || '';
+    const sorted = [...house.payments].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    return filterPaymentsByInstallmentPeriod(sorted, house, year || null, month || null);
+  }
+
+  function countCoveredInstallments(house, payments, periodId) {
+    const allSlots = periodId
+      ? listInstallmentsForPeriod(house, periodId)
+      : listAllInstallments(house);
+    const keys = new Set();
+    for (const p of payments) {
+      const k = p.installmentKey || inferInstallmentKey(house, p);
+      if (k) keys.add(k);
+    }
+    return { covered: keys.size, total: allSlots.length };
   }
 
   function renderDueFormDefaults(house) {
@@ -159,6 +230,9 @@ export function createRenderer(els) {
 
   function renderPeriodSelects(house) {
     renderDueFormDefaults(house);
+    if (els.dueSplitMode && !els.dueEditId?.value) els.dueSplitMode.value = 'monthly';
+    if (els.dueKind && !els.dueEditId?.value) els.dueKind.value = 'preventivo';
+    syncDueKindFields();
     if (els.paymentDate) els.paymentDate.value ||= today;
     syncPaymentPeriodSelect(house);
   }
@@ -168,13 +242,20 @@ export function createRenderer(els) {
     renderHousesManageList();
   }
 
+  function activePeriodFilterId() {
+    const v = els.periodFilter?.value;
+    return v && v !== 'all' ? v : null;
+  }
+
   function renderMetrics(house) {
-    const t = totals(house);
+    const periodId = activePeriodFilterId();
+    const t = totals(house, periodId);
+    const scope = periodId ? periodLabel(house, periodId) : 'Tutti gli esercizi';
     const metricData = [
-      ['Totale dovuto', fmt(t.due), `${house.dues.length} registrazioni`],
-      ['Totale versato', fmt(t.paid), `${house.payments.length} versamenti`],
-      ['Saldo complessivo', fmt(t.balance), t.balance >= 0 ? 'Sei in eccedenza' : 'Sei in debito', t.balance >= 0 ? 'positive' : 'negative'],
-      ['Esercizi fiscali', String(t.years), `${t.debtYears} in debito · ${t.creditYears} in eccedenza`, t.debtYears ? 'warning' : 'positive']
+      ['Preventivo', fmt(t.preventivo), scope],
+      ['Consuntivo', fmt(t.consuntivo), periodId ? 'Addebiti consuntivi' : `${t.dueCount} voci dovuto`],
+      ['Versato', fmt(t.paid), `${t.paymentCount} versamenti`],
+      ['Saldo consuntivo', fmt(t.balanceConsuntivo), t.balanceConsuntivo >= 0 ? 'Eccedenza su consuntivo' : 'Debito su consuntivo', t.balanceConsuntivo >= 0 ? 'positive' : 'negative']
     ];
     els.metrics.innerHTML = metricData.map(([label, value, foot, status]) =>
       `<article class="card"><div class="metric-label">${label}</div><div class="metric-value ${status || ''}">${value}</div><div class="metric-foot">${foot}</div></article>`
@@ -196,20 +277,23 @@ export function createRenderer(els) {
     if (!filtered.length) {
       els.annualTableWrap.innerHTML = '<div class="empty">Nessuna annualità da mostrare.</div>';
     } else {
-      els.annualTableWrap.innerHTML = `<table><thead><tr><th>Esercizio</th><th>Dovuto</th><th>Versato</th><th>Saldo</th><th>Stato</th></tr></thead><tbody>${filtered.map(item => {
-        const status = item.balance > 0 ? ['In eccedenza', 'success'] : item.balance < 0 ? ['In debito', 'error'] : ['Pareggio', 'warn'];
-        return `<tr><td>${item.label}<div class="hint">${item.startDate || ''} → ${item.endDate || ''}</div></td><td class="amount">${fmt(item.due)}</td><td class="amount">${fmt(item.paid)}</td><td class="amount ${item.balance >= 0 ? 'positive' : 'negative'}">${fmt(item.balance)}</td><td><span class="badge ${status[1]}">${status[0]}</span></td></tr>`;
+      els.annualTableWrap.innerHTML = `<table><thead><tr><th>Esercizio</th><th>Preventivo</th><th>Consuntivo</th><th>Versato</th><th>Saldo cons.</th><th>Stato</th></tr></thead><tbody>${filtered.map(item => {
+        const b = item.balanceConsuntivo;
+        const status = b > 0 ? ['Eccedenza', 'success'] : b < 0 ? ['In debito', 'error'] : ['Pareggio', 'warn'];
+        return `<tr><td>${item.label}<div class="hint">${item.startDate || ''} → ${item.endDate || ''}</div></td><td class="amount">${fmt(item.preventivo)}</td><td class="amount">${fmt(item.consuntivo)}</td><td class="amount">${fmt(item.paid)}</td><td class="amount ${b >= 0 ? 'positive' : 'negative'}">${fmt(b)}</td><td><span class="badge ${status[1]}">${status[0]}</span></td></tr>`;
       }).join('')}</tbody></table>`;
     }
-    const cards = summary.length
-      ? `<div class="annual-list">${summary.map(item => {
-        const cls = item.balance > 0 ? 'success' : item.balance < 0 ? 'error' : 'warn';
-        const label = item.balance > 0 ? 'Eccedenza' : item.balance < 0 ? 'Debito' : 'Pareggio';
-        return `<div class="annual-item"><div><strong>${item.label}</strong><div class="hint">Dovuto ${fmt(item.due)} · Versato ${fmt(item.paid)}</div></div><div><span class="badge ${cls}">${label}</span></div><strong class="${item.balance >= 0 ? 'positive' : 'negative'}">${fmt(item.balance)}</strong></div>`;
+    const cardsSource = els.periodFilter.value === 'all' ? summary : filtered;
+    const cards = cardsSource.length
+      ? `<div class="annual-list">${cardsSource.map(item => {
+        const b = item.balanceConsuntivo;
+        const cls = b > 0 ? 'success' : b < 0 ? 'error' : 'warn';
+        const label = b > 0 ? 'Eccedenza' : b < 0 ? 'Debito' : 'Pareggio';
+        return `<div class="annual-item"><div><strong>${item.label}</strong><div class="hint">Prev. ${fmt(item.preventivo)} · Cons. ${fmt(item.consuntivo)} · Vers. ${fmt(item.paid)}</div></div><div><span class="badge ${cls}">${label}</span></div><strong class="${b >= 0 ? 'positive' : 'negative'}">${fmt(b)}</strong></div>`;
       }).join('')}</div>`
       : '<div class="empty">Nessuna annualità registrata.</div>';
     els.annualCards.innerHTML = summary.length ? cards : '<div class="empty">Nessun saldo disponibile.</div>';
-    els.annualPageCards.innerHTML = cards;
+    if (els.annualPageCards) els.annualPageCards.innerHTML = cards;
   }
 
   function renderDues(house) {
@@ -223,20 +307,160 @@ export function createRenderer(els) {
       els.duesTable.innerHTML = '<div class="empty">Nessun dovuto registrato.</div>';
       return;
     }
-    els.duesTable.innerHTML = `<table><thead><tr><th>Esercizio</th><th>Descrizione</th><th>Importo</th><th></th></tr></thead><tbody>${dues.map(item =>
-      `<tr><td>${periodLabel(house, item.fiscalPeriodId)}</td><td>${item.description || '—'}</td><td class="amount">${fmt(item.amount)}</td><td>${rowActions('due', item.id)}</td></tr>`
-    ).join('')}</tbody></table>`;
+    els.duesTable.innerHTML = `<table><thead><tr><th>Esercizio</th><th>Tipo</th><th>Descrizione</th><th>Ripartizione</th><th>Importo</th><th></th></tr></thead><tbody>${dues.map(item => {
+      const kind = DUE_KINDS[item.dueKind || 'preventivo']?.label || item.dueKind;
+      const splitLabel = item.dueKind === 'consuntivo' ? '—' : (SPLIT_MODES[item.splitMode]?.label || (item.splitMode === 'custom' ? 'Custom' : 'Mensile'));
+      const carry = item.carryFromPeriodId ? ' <span class="badge warn">Riporto</span>' : '';
+      const amtCls = Number(item.amount) < 0 ? 'negative' : '';
+      return `<tr><td>${periodLabel(house, item.fiscalPeriodId)}</td><td>${kind}${carry}</td><td>${item.description || '—'}</td><td>${splitLabel}</td><td class="amount ${amtCls}">${fmt(item.amount)}</td><td>${rowActions('due', item.id)}</td></tr>`;
+    }).join('')}</tbody></table>`;
+  }
+
+  function paymentRowHtml(house, item) {
+    const key = item.installmentKey || inferInstallmentKey(house, item);
+    const rata = installmentShortLabel(house, key);
+    const inferred = !item.installmentKey && key;
+    const amt = Number(item.amount || 0);
+    const amtCls = amt >= 0 ? 'positive' : 'negative';
+    const carry = item.isCarryForward ? ' <span class="badge warn">Riporto</span>' : '';
+    const rataCell = inferred ? `${rata} <span class="hint">(stimata)</span>` : rata;
+    return `<tr><td>${periodLabel(house, item.fiscalPeriodId)}</td><td>${rataCell}${carry}</td><td>${item.date || '—'}</td><td>${item.method || '—'}</td><td class="amount ${amtCls}">${fmt(amt)}</td><td>${rowActions('payment', item.id)}</td></tr>`;
   }
 
   function renderPayments(house) {
-    const payments = [...house.payments].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
-    if (!payments.length) {
+    renderPaymentFilterOptions(house);
+    const payments = getFilteredPayments(house);
+    const summary = paymentsSummaryForList(payments, house);
+    const periodId = els.periodFilter?.value !== 'all' ? els.periodFilter?.value : null;
+    const coverage = countCoveredInstallments(house, payments, periodId);
+    if (els.paymentsSummary) {
+      const ratio = coverage.total ? `${coverage.covered}/${coverage.total} rate coperte` : '— rate';
+      els.paymentsSummary.textContent = `${summary.count} versamenti · ${ratio} · Totale ${fmt(summary.total)}`;
+    }
+    if (!house.payments.length) {
       els.paymentsTable.innerHTML = '<div class="empty">Nessun versamento registrato.</div>';
       return;
     }
-    els.paymentsTable.innerHTML = `<table><thead><tr><th>Esercizio</th><th>Data</th><th>Metodo</th><th>Importo</th><th></th></tr></thead><tbody>${payments.map(item =>
-      `<tr><td>${periodLabel(house, item.fiscalPeriodId)}</td><td>${item.date || '—'}</td><td>${item.method || '—'}</td><td class="amount positive">${fmt(item.amount)}</td><td>${rowActions('payment', item.id)}</td></tr>`
-    ).join('')}</tbody></table>`;
+    if (!payments.length) {
+      els.paymentsTable.innerHTML = '<div class="empty">Nessun versamento per il periodo rata selezionato.</div>';
+      return;
+    }
+    els.paymentsTable.innerHTML = `<table><thead><tr><th>Esercizio</th><th>Rata</th><th>Data vers.</th><th>Metodo</th><th>Importo</th><th></th></tr></thead><tbody>${payments.map(item => paymentRowHtml(house, item)).join('')}</tbody></table>`;
+  }
+
+  function renderDashboardPayments(house) {
+    if (!els.dashboardPayments) return;
+    const periodId = els.periodFilter?.value;
+    let payments = [...house.payments].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    if (periodId && periodId !== 'all') {
+      payments = payments.filter(p => p.fiscalPeriodId === periodId);
+    }
+    if (!payments.length) {
+      els.dashboardPayments.innerHTML = '<div class="empty">Nessun versamento nel contesto selezionato.</div>';
+      return;
+    }
+    els.dashboardPayments.innerHTML = `<table><thead><tr><th>Esercizio</th><th>Rata</th><th>Data vers.</th><th>Importo</th></tr></thead><tbody>${payments.map(item => {
+      const key = item.installmentKey || inferInstallmentKey(house, item);
+      const amt = Number(item.amount || 0);
+      const amtCls = amt >= 0 ? 'positive' : 'negative';
+      return `<tr><td>${periodLabel(house, item.fiscalPeriodId)}</td><td>${installmentShortLabel(house, key)}</td><td>${item.date || '—'}</td><td class="amount ${amtCls}">${fmt(amt)}</td></tr>`;
+    }).join('')}</tbody></table>`;
+  }
+
+  function renderSituazioneSummaryChips(totalsRow, report) {
+    const cons = situazioneStatusLabel(totalsRow?.balanceConsuntivo ?? 0);
+    const prev = situazioneStatusLabel(totalsRow?.balancePreventivo ?? 0);
+    const chips = [
+      ['Preventivo', fmt(totalsRow?.preventivo ?? 0), 'Totale voci'],
+      ['Consuntivo', fmt(totalsRow?.consuntivo ?? 0), 'Addebiti consuntivi'],
+      ['Versato', fmt(totalsRow?.paid ?? 0), `${report.periodPayments.length} movimenti`],
+      ['Saldo consuntivo', fmt(totalsRow?.balanceConsuntivo ?? 0), cons.text, cons.cls],
+      ['Saldo rate prev.', fmt(report.slotsBalance), 'Versato − rate', report.slotsBalance >= 0 ? 'positive' : 'negative']
+    ];
+    return chips.map(([label, value, foot, status]) =>
+      `<div class="metric-chip"><span class="muted">${label}</span><strong class="${status || ''}">${value}</strong><span class="hint">${foot}</span></div>`
+    ).join('');
+  }
+
+  function renderRateTable(slots) {
+    if (!slots.length) return '';
+    const body = slots.map(slot => {
+      const balCls = slot.balance >= 0 ? 'positive' : 'negative';
+      const payRows = slot.payments.map(p =>
+        `<tr class="situazione-pay-row"><td colspan="2" class="hint">↳ ${p.date || '—'} · ${p.method || '—'}${p.isCarryForward ? ' · Riporto' : ''}</td><td></td><td class="amount ${Number(p.amount) >= 0 ? 'positive' : 'negative'}">${fmt(p.amount)}</td><td></td></tr>`
+      ).join('');
+      return `<tr><td>${slot.label}</td><td>${slot.dueDescription || '—'}</td><td class="amount">${fmt(slot.amountDue)}</td><td class="amount">${fmt(slot.paid)}</td><td class="amount ${balCls}">${fmt(slot.balance)}</td></tr>${payRows}`;
+    }).join('');
+    return `<div class="situazione-section"><h3 class="situazione-section-title">Preventivo — dettaglio rate</h3><div class="table-scroll"><table><thead><tr><th>Rata</th><th>Voce</th><th>Dovuto</th><th>Versato</th><th>Saldo</th></tr></thead><tbody>${body}</tbody></table></div></div>`;
+  }
+
+  function renderConsuntivoSection(report, totalsRow) {
+    if (!report.consuntivoDues.length) return '';
+    const rows = report.consuntivoDues.map(d =>
+      `<tr><td>${d.description || 'Consuntivo'}</td><td class="amount">${fmt(d.amount)}</td></tr>`
+    ).join('');
+    const b = totalsRow?.balanceConsuntivo ?? 0;
+    const balCls = b >= 0 ? 'positive' : 'negative';
+    return `<div class="situazione-section"><h3 class="situazione-section-title">Consuntivo</h3><div class="table-scroll"><table><thead><tr><th>Descrizione</th><th>Importo</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th>Totale consuntivo</th><td class="amount">${fmt(report.consuntivoTotal)}</td></tr><tr><th>Saldo (versato − consuntivo)</th><td class="amount ${balCls}">${fmt(b)}</td></tr></tfoot></table></div></div>`;
+  }
+
+  function renderCarrySection(house, carryDues) {
+    if (!carryDues.length) return '';
+    const rows = carryDues.map(d => {
+      const amtCls = Number(d.amount) < 0 ? 'negative' : '';
+      return `<tr><td>${d.description || 'Riporto'}</td><td>${carryFromLabel(house, d)}</td><td class="amount ${amtCls}">${fmt(d.amount)}</td></tr>`;
+    }).join('');
+    return `<div class="situazione-section"><h3 class="situazione-section-title">Riporti su preventivo</h3><div class="table-scroll"><table><thead><tr><th>Descrizione</th><th>Da esercizio</th><th>Importo</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }
+
+  function renderUnlinkedSection(unlinked) {
+    if (!unlinked.length) return '';
+    const rows = unlinked.map(p => {
+      const cls = Number(p.amount) >= 0 ? 'positive' : 'negative';
+      return `<tr><td>${p.date || '—'}</td><td>${p.method || '—'}</td><td class="amount ${cls}">${fmt(p.amount)}</td></tr>`;
+    }).join('');
+    return `<div class="situazione-section"><h3 class="situazione-section-title">Versamenti senza rata</h3><div class="table-scroll"><table><thead><tr><th>Data vers.</th><th>Metodo</th><th>Importo</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }
+
+  function renderSituazione(house) {
+    if (!els.situazioneSections || !els.situazionePeriod) return;
+    const summary = periodSummary(house);
+    if (!summary.length) {
+      els.situazionePeriod.innerHTML = '';
+      if (els.situazioneSummary) els.situazioneSummary.innerHTML = '';
+      els.situazioneSections.innerHTML = '<div class="empty">Nessun esercizio registrato.</div>';
+      return;
+    }
+    const current = els.situazionePeriod.value;
+    els.situazionePeriod.innerHTML = summary.map(s =>
+      `<option value="${s.id}" ${s.id === current ? 'selected' : ''}>${s.label}</option>`
+    ).join('');
+    const periodId = els.situazionePeriod.value || summary[0].id;
+    if (!els.situazionePeriod.value) els.situazionePeriod.value = periodId;
+
+    const report = buildSituazioneReport(house, periodId);
+    const totalsRow = report.totalsRow;
+    if (!report.slots.length && !report.consuntivoTotal && !report.preventivoDues.length) {
+      if (els.situazioneSummary) els.situazioneSummary.innerHTML = '';
+      els.situazioneSections.innerHTML = '<div class="empty">Nessun preventivo/consuntivo per questo esercizio.</div>';
+      return;
+    }
+
+    if (els.situazioneSummary) {
+      els.situazioneSummary.innerHTML = renderSituazioneSummaryChips(totalsRow, report);
+    }
+    els.situazioneSections.innerHTML = [
+      renderRateTable(report.slots),
+      renderConsuntivoSection(report, totalsRow),
+      renderCarrySection(house, report.carryDues),
+      renderUnlinkedSection(report.unlinkedPayments)
+    ].filter(Boolean).join('');
+  }
+
+  function syncDueKindFields() {
+    const isCons = els.dueKind?.value === 'consuntivo';
+    els.dueSplitFields?.classList.toggle('hidden', isCons);
+    els.dueSplitCustomWrap?.classList.toggle('hidden', isCons || els.dueSplitMode?.value !== 'custom');
   }
 
   function renderMovements(house) {
@@ -323,6 +547,10 @@ export function createRenderer(els) {
     els.annualCards.innerHTML = '<div class="empty">Nessun saldo disponibile.</div>';
     els.annualPageCards.innerHTML = '<div class="empty">Nessuna annualità registrata.</div>';
     els.paymentsTable.innerHTML = '<div class="empty">Nessun versamento registrato.</div>';
+    if (els.paymentsSummary) els.paymentsSummary.textContent = '';
+    if (els.dashboardPayments) els.dashboardPayments.innerHTML = '<div class="empty">Nessun versamento.</div>';
+    if (els.situazioneSummary) els.situazioneSummary.innerHTML = '';
+    if (els.situazioneSections) els.situazioneSections.innerHTML = '<div class="empty">Nessuna situazione disponibile.</div>';
     if (els.duesTable) els.duesTable.innerHTML = '<div class="empty">Nessun dovuto registrato.</div>';
     els.movements.innerHTML = '<div class="empty">Nessun movimento da mostrare.</div>';
     if (state.houseFormMode === 'new') renderNewHouseForm();
@@ -350,6 +578,8 @@ export function createRenderer(els) {
     renderAnnualBlocks(house);
     renderDues(house);
     renderPayments(house);
+    renderDashboardPayments(house);
+    renderSituazione(house);
     renderMovements(house);
     renderHouseForm(house);
     renderPeriodSelects(house);
@@ -358,7 +588,16 @@ export function createRenderer(els) {
     if (state.currentView === 'impostazioni' && state.currentSubview === 'account') authRenderAccount?.();
   }
 
-  return { setView, render, renderBankImportPreview, renderUnlinkedMovements, syncPaymentPeriodSelect, renderNewHouseForm };
+  return {
+    setView,
+    render,
+    renderBankImportPreview,
+    renderUnlinkedMovements,
+    syncPaymentPeriodSelect,
+    syncPaymentInstallmentSelect,
+    syncDueKindFields,
+    renderNewHouseForm
+  };
 }
 
 export function collectDom() {
@@ -434,6 +673,20 @@ export function collectDom() {
     paymentSubmitBtn: document.getElementById('paymentSubmitBtn'),
     paymentFormCancel: document.getElementById('paymentFormCancel'),
     paymentsTable: document.getElementById('paymentsTable'),
+    paymentInstallment: document.getElementById('paymentInstallment'),
+    paymentFilterYear: document.getElementById('paymentFilterYear'),
+    paymentFilterMonth: document.getElementById('paymentFilterMonth'),
+    paymentsSummary: document.getElementById('paymentsSummary'),
+    dashboardPayments: document.getElementById('dashboardPayments'),
+    situazionePeriod: document.getElementById('situazionePeriod'),
+    situazioneSummary: document.getElementById('situazioneSummary'),
+    situazioneSections: document.getElementById('situazioneSections'),
+    situazionePdfBtn: document.getElementById('situazionePdfBtn'),
+    dueSplitMode: document.getElementById('dueSplitMode'),
+    dueSplitCustom: document.getElementById('dueSplitCustom'),
+    dueSplitCustomWrap: document.getElementById('dueSplitCustomWrap'),
+    dueKind: document.getElementById('dueKind'),
+    dueSplitFields: document.getElementById('dueSplitFields'),
     navButtons: [...document.querySelectorAll('.nav-rail [data-view], .bottom-nav [data-view]')],
     subviewTabs: [...document.querySelectorAll('[data-subview]')],
     subviewPanels: [...document.querySelectorAll('[data-subview-panel]')],

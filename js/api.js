@@ -2,6 +2,7 @@ import { DEFAULT_SUPABASE_ANON_KEY, DEFAULT_SUPABASE_URL } from './config.js';
 import { legacyCalendarPeriod, periodFromLabel } from './backup.js';
 import { mapHouseFromDb, state } from './state.js';
 import { ensurePeriodPayload, parseFiscalLabel } from './fiscal.js';
+import { findInstallmentForDate } from './installments.js';
 import { hashText, today, uid } from './utils.js';
 
 export function createSupabaseClient(createClient) {
@@ -72,7 +73,7 @@ export async function ensureFiscalPeriodBySpec(house, spec) {
   const existing = house.fiscalPeriods.find(p =>
     p.label === spec.label && p.startDate === spec.startDate && p.endDate === spec.endDate
   );
-  if (existing) return existing;
+  if (existing) return { period: existing, isNew: false };
 
   const { data, error } = await state.supabase.from('fiscal_periods').insert({
     house_id: Number(house.id),
@@ -87,7 +88,7 @@ export async function ensureFiscalPeriodBySpec(house, spec) {
       if (row) {
         const period = { id: String(row.id), label: row.label, startDate: row.start_date, endDate: row.end_date };
         if (!house.fiscalPeriods.some(p => p.id === period.id)) house.fiscalPeriods.push(period);
-        return period;
+        return { period, isNew: false };
       }
     }
     throw error;
@@ -95,22 +96,22 @@ export async function ensureFiscalPeriodBySpec(house, spec) {
 
   const period = { id: String(data.id), label: data.label, startDate: data.start_date, endDate: data.end_date };
   house.fiscalPeriods.push(period);
-  return period;
+  return { period, isNew: true };
 }
 
 export async function ensureFiscalPeriodByLabel(house, labelText) {
   const existing = house.fiscalPeriods.find(p => p.label === String(labelText).trim());
-  if (existing) return existing;
+  if (existing) return { period: existing, isNew: false };
   const spec = parseFiscalLabel(house, labelText);
   return ensureFiscalPeriodBySpec(house, spec);
 }
 
 export async function ensureFiscalPeriod(house, dateStr) {
   const existing = house.fiscalPeriods.find(p => dateStr >= p.startDate && dateStr <= p.endDate);
-  if (existing) return existing;
+  if (existing) return { period: existing, isNew: false };
 
   const spec = ensurePeriodPayload(house, dateStr);
-  if (spec.id) return { id: spec.id, label: spec.label, startDate: spec.startDate, endDate: spec.endDate };
+  if (spec.id) return { period: { id: spec.id, label: spec.label, startDate: spec.startDate, endDate: spec.endDate }, isNew: false };
   return ensureFiscalPeriodBySpec(house, spec);
 }
 
@@ -118,24 +119,32 @@ export async function saveDueToSupabase(house, due) {
   await ensureAuthenticated();
   let periodId = due.fiscalPeriodId;
   if (!periodId && due.fiscalPeriodLabel) {
-    const period = await ensureFiscalPeriodByLabel(house, due.fiscalPeriodLabel);
+    const { period } = await ensureFiscalPeriodByLabel(house, due.fiscalPeriodLabel);
     periodId = period.id;
   }
   if (!periodId) {
-    const period = await ensureFiscalPeriod(house, due.date || today);
+    const { period } = await ensureFiscalPeriod(house, due.date || today);
     periodId = period.id;
   }
   const payload = {
     house_id: Number(house.id),
     fiscal_period_id: Number(periodId),
     amount: due.amount,
-    description: due.description
+    description: due.description,
+    split_mode: due.splitMode || 'monthly',
+    split_custom: due.splitMode === 'custom' && Array.isArray(due.splitCustom) ? due.splitCustom : null,
+    due_kind: due.dueKind || 'preventivo',
+    carry_from_period_id: due.carryFromPeriodId ? Number(due.carryFromPeriodId) : null
   };
   if (Number.isFinite(Number(due.id))) {
     const { error } = await state.supabase.from('dues').update({
       fiscal_period_id: payload.fiscal_period_id,
       amount: payload.amount,
-      description: payload.description
+      description: payload.description,
+      split_mode: payload.split_mode,
+      split_custom: payload.split_custom,
+      due_kind: payload.due_kind,
+      carry_from_period_id: payload.carry_from_period_id
     }).eq('id', Number(due.id)).eq('house_id', Number(house.id));
     if (error) throw error;
     return;
@@ -157,7 +166,7 @@ export async function savePaymentToSupabase(house, payment) {
   await ensureAuthenticated();
   let periodId = payment.fiscalPeriodId;
   if (!periodId) {
-    const period = await ensureFiscalPeriod(house, payment.date || today);
+    const { period } = await ensureFiscalPeriod(house, payment.date || today);
     periodId = period.id;
   }
   const payload = {
@@ -166,6 +175,9 @@ export async function savePaymentToSupabase(house, payment) {
     amount: payment.amount,
     date: payment.date,
     method: payment.method,
+    installment_key: payment.installmentKey || null,
+    carry_from_period_id: payment.carryFromPeriodId ? Number(payment.carryFromPeriodId) : null,
+    is_carry_forward: Boolean(payment.isCarryForward),
     bank_movement_id: payment.bankMovementId ? Number(payment.bankMovementId) : null
   };
   if (Number.isFinite(Number(payment.id))) {
@@ -173,7 +185,10 @@ export async function savePaymentToSupabase(house, payment) {
       fiscal_period_id: payload.fiscal_period_id,
       amount: payload.amount,
       date: payload.date,
-      method: payload.method
+      method: payload.method,
+      installment_key: payload.installment_key,
+      carry_from_period_id: payload.carry_from_period_id,
+      is_carry_forward: payload.is_carry_forward
     }).eq('id', Number(payment.id)).eq('house_id', Number(house.id));
     if (error) throw error;
     return;
@@ -217,7 +232,7 @@ export async function saveBankImport(house, batchId, previewRows) {
     const sourceHash = await movementHash(house.id, row);
     let periodId = row.manualPeriodId || row.suggestedFiscalPeriodId;
     if (!periodId) {
-      const period = await ensureFiscalPeriod(house, row.movementDate);
+      const { period } = await ensureFiscalPeriod(house, row.movementDate);
       periodId = period.id;
       row.manualPeriodId = periodId;
     }
@@ -243,13 +258,19 @@ export async function saveBankImport(house, batchId, previewRows) {
       throw bmErr;
     }
 
+    let installmentKey = null;
+    for (const d of house.dues.filter(d => String(d.fiscalPeriodId) === String(periodId) && (d.dueKind || 'preventivo') === 'preventivo')) {
+      const slot = findInstallmentForDate(house, d, row.movementDate);
+      if (slot) { installmentKey = slot.key; break; }
+    }
     const { data: pay, error: payErr } = await state.supabase.from('payments').insert({
       house_id: Number(house.id),
       fiscal_period_id: Number(periodId),
       amount: row.paymentAmount,
       date: row.movementDate,
       method: 'Import Intesa',
-      bank_movement_id: bm.id
+      bank_movement_id: bm.id,
+      installment_key: installmentKey
     }).select().single();
     if (payErr) throw payErr;
 
@@ -285,13 +306,19 @@ export async function linkBankMovement(house, movementId, fiscalPeriodId) {
   const { data: bm, error: bmErr } = await state.supabase.from('bank_movements').select('*').eq('id', Number(movementId)).single();
   if (bmErr) throw bmErr;
 
+  let installmentKey = null;
+  for (const d of house.dues.filter(d => String(d.fiscalPeriodId) === String(fiscalPeriodId))) {
+    const slot = findInstallmentForDate(house, d, bm.movement_date);
+    if (slot) { installmentKey = slot.key; break; }
+  }
   const { data: pay, error: payErr } = await state.supabase.from('payments').insert({
     house_id: Number(house.id),
     fiscal_period_id: Number(fiscalPeriodId),
     amount: Math.abs(Number(bm.amount)),
     date: bm.movement_date,
     method: 'Import Intesa (manuale)',
-    bank_movement_id: bm.id
+    bank_movement_id: bm.id,
+    installment_key: installmentKey
   }).select().single();
   if (payErr) throw payErr;
 
@@ -304,21 +331,35 @@ export async function linkBankMovement(house, movementId, fiscalPeriodId) {
 }
 
 export function createLocalDue(formData) {
+  const splitMode = String(formData.get('splitMode') || 'monthly');
+  const dueKind = String(formData.get('dueKind') || 'preventivo');
+  const customRaw = String(formData.get('splitCustom') || '').trim();
+  let splitCustom = null;
+  if (splitMode === 'custom' && customRaw) {
+    splitCustom = customRaw.split(/[,;\s]+/).map(s => Number(s.trim())).filter(n => Number.isFinite(n));
+  }
   return {
     id: uid('due'),
     amount: Number(formData.get('amount')),
     description: String(formData.get('description') || '').trim(),
+    splitMode: dueKind === 'consuntivo' ? 'monthly' : splitMode,
+    splitCustom: dueKind === 'consuntivo' ? null : splitCustom,
+    dueKind,
+    carryFromPeriodId: null,
     date: today
   };
 }
 
-export function createLocalPayment(formData, fiscalPeriodId) {
+export function createLocalPayment(formData, fiscalPeriodId, installmentKey) {
   return {
     id: uid('pay'),
     fiscalPeriodId: fiscalPeriodId || null,
+    installmentKey: installmentKey || null,
     amount: Number(formData.get('amount')),
     date: String(formData.get('date') || today),
-    method: String(formData.get('method') || '').trim()
+    method: String(formData.get('method') || '').trim(),
+    isCarryForward: false,
+    carryFromPeriodId: null
   };
 }
 
@@ -340,7 +381,8 @@ export async function syncBackupToSupabase(backup) {
     await saveHouseToSupabase(house);
 
     for (const spec of houseData.fiscalPeriods || []) {
-      await ensureFiscalPeriodBySpec(house, spec);
+      const { period } = await ensureFiscalPeriodBySpec(house, spec);
+      if (period && !house.fiscalPeriods.some(p => p.id === period.id)) house.fiscalPeriods.push(period);
     }
 
     const resolvePeriod = async (item) => {
@@ -348,7 +390,8 @@ export async function syncBackupToSupabase(backup) {
       if (!spec && item.date) spec = ensurePeriodPayload(house, item.date);
       if (!spec && item._legacyYear) spec = legacyCalendarPeriod(Number(item._legacyYear));
       if (!spec) return null;
-      return ensureFiscalPeriodBySpec(house, spec);
+      const { period } = await ensureFiscalPeriodBySpec(house, spec);
+      return period;
     };
 
     for (const due of houseData.dues || []) {
@@ -358,7 +401,11 @@ export async function syncBackupToSupabase(backup) {
         house_id: Number(house.id),
         fiscal_period_id: Number(period.id),
         amount: due.amount,
-        description: due.description || ''
+        description: due.description || '',
+        split_mode: due.splitMode || 'monthly',
+        split_custom: due.splitCustom || null,
+        due_kind: due.dueKind || 'preventivo',
+        carry_from_period_id: due.carryFromPeriodId ? Number(due.carryFromPeriodId) : null
       });
     }
 
@@ -370,7 +417,10 @@ export async function syncBackupToSupabase(backup) {
         fiscal_period_id: Number(period.id),
         amount: payment.amount,
         date: payment.date || null,
-        method: payment.method || ''
+        method: payment.method || '',
+        installment_key: payment.installmentKey || null,
+        carry_from_period_id: payment.carryFromPeriodId ? Number(payment.carryFromPeriodId) : null,
+        is_carry_forward: Boolean(payment.isCarryForward)
       });
     }
   }

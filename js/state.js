@@ -55,6 +55,10 @@ export function mapHouseFromDb(house, dues, payments, periods, movements) {
       fiscalPeriodId: String(d.fiscal_period_id),
       amount: Number(d.amount),
       description: d.description || '',
+      splitMode: d.split_mode || 'monthly',
+      splitCustom: Array.isArray(d.split_custom) ? d.split_custom : null,
+      dueKind: d.due_kind || 'preventivo',
+      carryFromPeriodId: d.carry_from_period_id ? String(d.carry_from_period_id) : null,
       date: d.created_at?.slice(0, 10) || today
     })),
     payments: (payments || []).map(p => ({
@@ -63,6 +67,9 @@ export function mapHouseFromDb(house, dues, payments, periods, movements) {
       amount: Number(p.amount),
       date: p.date || '',
       method: p.method || '',
+      installmentKey: p.installment_key || null,
+      carryFromPeriodId: p.carry_from_period_id ? String(p.carry_from_period_id) : null,
+      isCarryForward: Boolean(p.is_carry_forward),
       bankMovementId: p.bank_movement_id ? String(p.bank_movement_id) : null
     })),
     bankMovements: (movements || []).map(m => ({

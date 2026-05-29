@@ -1,0 +1,20 @@
+<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:22px;background:var(--color-bg);color:var(--color-text)}
+  .stack{display:grid;gap:14px}
+  .num{font-variant-numeric:tabular-nums lining-nums;font-weight:700;font-size:30px}
+  .pos{color:var(--color-success)} .neg{color:var(--color-error)}
+  table{border-collapse:collapse;width:100%;margin-top:4px}
+  td{font-variant-numeric:tabular-nums lining-nums;font-weight:700;padding:3px 18px 3px 0;font-size:17px}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-muted)}
+</style></head><body>
+<div class="stack">
+  <div class="eyebrow">Tabular lining numerals — aligned euro columns</div>
+  <table>
+    <tr><td>Totale dovuto</td><td>1.240,00 €</td></tr>
+    <tr><td>Totale versato</td><td>980,50 €</td></tr>
+    <tr><td>Saldo</td><td class="pos">+259,50 €</td></tr>
+  </table>
+  <div><span class="num pos">+1.234,56 €</span> &nbsp; <span class="num neg">−820,00 €</span></div>
+</div>
+</body></html>

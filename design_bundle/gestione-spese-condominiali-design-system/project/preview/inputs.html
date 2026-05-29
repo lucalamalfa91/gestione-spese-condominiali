@@ -1,0 +1,16 @@
+<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:22px;background:var(--color-bg);color:var(--color-text)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  label{display:block;font-size:var(--text-sm);color:var(--color-text-muted);margin-bottom:.35rem}
+  input,select{width:100%;min-height:44px;background:var(--color-surface-2);border:1px solid rgba(0,0,0,.1);border-radius:var(--radius-md);padding:.8rem .9rem;font:inherit;color:inherit}
+  input.focus{outline:2px solid var(--color-primary);outline-offset:2px;border-color:var(--color-primary)}
+  .full{grid-column:1/-1}
+</style></head><body>
+<div class="grid">
+  <div><label>Esercizio fiscale</label><input value="2024/2025"></div>
+  <div><label>Importo dovuto</label><input class="focus" value="1.240,00"></div>
+  <div class="full"><label>Mese inizio esercizio</label><select><option>Giugno (es. 2024/2025)</option></select></div>
+  <div class="full"><label>Descrizione</label><input placeholder="Preventivo, saldo, conguaglio…"></div>
+</div>
+</body></html>

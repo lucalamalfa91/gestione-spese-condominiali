@@ -1,0 +1,16 @@
+<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:24px;background:var(--color-bg)}
+  .row{display:flex;gap:14px;align-items:center}
+  .badge{display:inline-flex;align-items:center;gap:.4rem;padding:.4rem .75rem;border-radius:var(--radius-full);font-size:13px;font-weight:700}
+  .success{background:var(--color-success-highlight);color:var(--color-success)}
+  .warn{background:var(--color-warning-highlight);color:var(--color-warning)}
+  .error{background:var(--color-error-highlight);color:var(--color-error)}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+</style></head><body>
+<div class="row">
+  <span class="badge success"><span class="dot"></span>Eccedenza</span>
+  <span class="badge warn"><span class="dot"></span>Pareggio</span>
+  <span class="badge error"><span class="dot"></span>Debito</span>
+</div>
+</body></html>

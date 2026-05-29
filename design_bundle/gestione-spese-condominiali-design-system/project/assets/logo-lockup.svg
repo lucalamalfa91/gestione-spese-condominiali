@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="48" viewBox="0 0 220 48" fill="none">
+  <rect x="0" y="3" width="42" height="42" rx="12" fill="#cedcd8"></rect>
+  <g transform="translate(9 12)" stroke="#01696f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M0 16V6.8L9.6 1.6 19.2 6.8V16"></path>
+    <path d="M3.2 16v-4.8h6.4V16"></path>
+  </g>
+  <text x="56" y="22" font-family="&#39;IBM Plex Sans&#39;, system-ui, sans-serif" font-size="15" font-weight="700" fill="#28251d">Condominio</text>
+  <text x="56" y="38" font-family="&#39;IBM Plex Sans&#39;, system-ui, sans-serif" font-size="12" font-weight="500" fill="#7a7974">Gestione spese</text>
+</svg>

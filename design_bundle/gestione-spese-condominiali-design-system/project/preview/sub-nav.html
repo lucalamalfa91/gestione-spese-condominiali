@@ -1,0 +1,14 @@
+<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:22px;background:var(--color-bg)}
+  .sub-nav{display:inline-flex;gap:.35rem;padding:.35rem;background:var(--color-surface-offset);border-radius:var(--radius-lg);border:1px solid rgba(0,0,0,.06)}
+  .sub-nav-btn{min-height:40px;padding:.5rem 1rem;border-radius:var(--radius-md);font-size:14px;font-weight:600;color:var(--color-text-muted);background:transparent;border:1px solid transparent}
+  .sub-nav-btn.active{background:var(--color-surface);color:var(--color-text);border-color:rgba(0,0,0,.08);box-shadow:var(--shadow-sm)}
+</style></head><body>
+<div class="sub-nav">
+  <button class="sub-nav-btn active">Dovuti</button>
+  <button class="sub-nav-btn">Versamenti</button>
+  <button class="sub-nav-btn">Import banca</button>
+  <button class="sub-nav-btn">Situazione</button>
+</div>
+</body></html>

@@ -1,0 +1,23 @@
+<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:var(--color-bg);color:var(--color-text)}
+  .panel{background:var(--color-surface);border:1px solid rgba(0,0,0,.08);border-radius:var(--radius-xl);box-shadow:var(--shadow-sm);padding:1.25rem}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:.7rem .5rem;border-bottom:1px solid var(--color-divider);text-align:left;font-variant-numeric:tabular-nums lining-nums}
+  th{color:var(--color-text-muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  td.amount{font-weight:700}
+  .positive{color:var(--color-success)} .negative{color:var(--color-error)}
+  .badge{display:inline-flex;padding:.25rem .55rem;border-radius:var(--radius-full);font-size:12px;font-weight:700}
+  .success{background:var(--color-success-highlight);color:var(--color-success)}
+  .error{background:var(--color-error-highlight);color:var(--color-error)}
+</style></head><body>
+<div class="panel">
+  <table>
+    <thead><tr><th>Esercizio</th><th>Dovuto</th><th>Versato</th><th>Saldo</th><th>Stato</th></tr></thead>
+    <tbody>
+      <tr><td>2024/2025</td><td class="amount">1.240,00 €</td><td class="amount">1.499,50 €</td><td class="amount positive">+259,50 €</td><td><span class="badge success">In eccedenza</span></td></tr>
+      <tr><td>2023/2024</td><td class="amount">1.180,00 €</td><td class="amount">980,00 €</td><td class="amount negative">−200,00 €</td><td><span class="badge error">In debito</span></td></tr>
+    </tbody>
+  </table>
+</div>
+</body></html>

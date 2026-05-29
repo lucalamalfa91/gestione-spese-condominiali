@@ -1,0 +1,21 @@
+<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:var(--color-bg)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .pair{display:grid;gap:8px}
+  .lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-muted)}
+  .sw{border-radius:var(--radius-lg);overflow:hidden;border:1px solid rgba(0,0,0,.08)}
+  .solid{height:48px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .tint{height:34px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .name{font-size:12px;font-weight:700;color:var(--color-text);margin-top:2px}
+  .hex{font-size:11px;color:var(--color-text-muted);font-variant-numeric:tabular-nums}
+</style></head><body>
+<div class="grid">
+  <div class="pair"><div class="lbl">Success · Eccedenza</div>
+    <div class="sw"><div class="solid" style="background:#437a22;color:#fff">#437a22</div><div class="tint" style="background:#d4dfcc;color:#437a22">highlight</div></div></div>
+  <div class="pair"><div class="lbl">Warning · Pareggio</div>
+    <div class="sw"><div class="solid" style="background:#964219;color:#fff">#964219</div><div class="tint" style="background:#ddcfc6;color:#964219">highlight</div></div></div>
+  <div class="pair"><div class="lbl">Error · Debito</div>
+    <div class="sw"><div class="solid" style="background:#a12c7b;color:#fff">#a12c7b</div><div class="tint" style="background:#e0ced7;color:#a12c7b">highlight</div></div></div>
+</div>
+</body></html>

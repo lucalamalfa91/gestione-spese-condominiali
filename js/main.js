@@ -20,12 +20,15 @@ import {
 import { createAuthHandlers } from './auth.js';
 import { exportBackup, parseBackup } from './backup.js';
 import { resolveView } from './config.js';
+import { suggestCarryover } from './carryover.js';
 import { periodLabel } from './fiscal.js';
+import { findInstallmentForDate } from './installments.js';
+import { exportSituazionePdf } from './pdf-situazione.js';
 import { parseIntesaFile } from './intesa.js';
 import { enrichPreview } from './matching.js';
 import { collectDom, createRenderer } from './render.js';
 import { activeHouse, createLocalHouse, state } from './state.js';
-import { today, uid } from './utils.js';
+import { fmt, today, uid } from './utils.js';
 
 const els = collectDom();
 
@@ -34,7 +37,7 @@ function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
 }
 
-const { setView, render: baseRender, syncPaymentPeriodSelect } = createRenderer(els);
+const { setView, render: baseRender, syncPaymentPeriodSelect, syncPaymentInstallmentSelect, syncDueKindFields } = createRenderer(els);
 let renderedHouseId = null;
 function render(...args) {
   const house = activeHouse();
@@ -90,6 +93,12 @@ function startEditDue(house, due) {
   els.duePeriodLabel.value = periodLabel(house, due.fiscalPeriodId);
   els.dueForm.amount.value = String(due.amount);
   els.dueForm.description.value = due.description || '';
+  if (els.dueKind) els.dueKind.value = due.dueKind || 'preventivo';
+  if (els.dueSplitMode) els.dueSplitMode.value = due.splitMode || 'monthly';
+  if (els.dueSplitCustom) {
+    els.dueSplitCustom.value = Array.isArray(due.splitCustom) ? due.splitCustom.join(',') : '';
+  }
+  syncDueKindFields();
   if (els.dueEditId) els.dueEditId.value = due.id;
   if (els.dueSubmitBtn) els.dueSubmitBtn.textContent = 'Aggiorna dovuto';
   els.dueFormCancel?.classList.remove('hidden');
@@ -106,6 +115,7 @@ function startEditPayment(house, payment) {
   els.paymentFormCancel?.classList.remove('hidden');
   syncPaymentPeriodSelect(house);
   if (payment.fiscalPeriodId) els.paymentPeriod.value = payment.fiscalPeriodId;
+  syncPaymentInstallmentSelect(house, payment.installmentKey || null);
   navigate('movimenti', 'versamenti');
   els.paymentForm?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -233,7 +243,7 @@ async function confirmBankImport() {
     for (const row of state.bankImportPreview) {
       if (!row.selected || row.ineligible) continue;
       if (!row.manualPeriodId && !row.suggestedFiscalPeriodId) {
-        const p = await ensureFiscalPeriod(house, row.movementDate);
+        const { period: p } = await ensureFiscalPeriod(house, row.movementDate);
         row.manualPeriodId = p.id;
       } else if (!row.manualPeriodId) {
         row.manualPeriodId = row.suggestedFiscalPeriodId;
@@ -255,7 +265,7 @@ function exportJson() {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'spese-condominiali-v2.json';
+  a.download = 'spese-condominiali-v3.json';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -335,6 +345,24 @@ els.loginThemeToggle.addEventListener('click', () => setTheme(state.theme === 'd
 els.recoveryThemeToggle.addEventListener('click', () => setTheme(state.theme === 'dark' ? 'light' : 'dark'));
 wireNavigation();
 els.periodFilter.addEventListener('change', () => { const h = activeHouse(); if (h) render(); });
+els.paymentFilterYear?.addEventListener('change', () => { const h = activeHouse(); if (h) render(); });
+els.paymentFilterMonth?.addEventListener('change', () => { const h = activeHouse(); if (h) render(); });
+els.paymentPeriod?.addEventListener('change', () => {
+  const house = activeHouse();
+  if (house) syncPaymentInstallmentSelect(house);
+});
+els.situazionePeriod?.addEventListener('change', () => { const h = activeHouse(); if (h) render(); });
+els.situazionePdfBtn?.addEventListener('click', async () => {
+  const house = ensureHouse();
+  if (!house || !els.situazionePeriod?.value) return;
+  try {
+    await exportSituazionePdf(house, els.situazionePeriod.value);
+  } catch (err) {
+    alert(err.message || 'Errore export PDF');
+  }
+});
+els.dueKind?.addEventListener('change', syncDueKindFields);
+els.dueSplitMode?.addEventListener('change', syncDueKindFields);
 els.logoutBtn.addEventListener('click', auth.logout);
 
 els.quickAddFab?.addEventListener('click', openQuickAddSheet);
@@ -409,15 +437,26 @@ els.dueForm.addEventListener('submit', async e => {
     const due = createLocalDue(fd);
     due.fiscalPeriodLabel = String(fd.get('fiscalPeriodLabel') || els.duePeriodLabel?.value || '').trim();
     if (editId) due.id = editId;
+    let newPeriodId = null;
     if (state.supabase && state.user) {
+      if (due.fiscalPeriodLabel) {
+        const { period, isNew } = await ensureFiscalPeriodByLabel(house, due.fiscalPeriodLabel);
+        due.fiscalPeriodId = period.id;
+        if (isNew) newPeriodId = period.id;
+      }
       await saveDueToSupabase(house, due);
       resetDueForm();
       await loadFromSupabase();
+      const houseAfter = activeHouse();
+      if (houseAfter && newPeriodId) await offerCarryoverDue(houseAfter, newPeriodId);
     } else if (editId) {
       const existing = house.dues.find(d => d.id === editId);
       if (existing) {
         existing.amount = due.amount;
         existing.description = due.description;
+        existing.splitMode = due.splitMode;
+        existing.splitCustom = due.splitCustom;
+        existing.dueKind = due.dueKind;
         existing.fiscalPeriodId = due.fiscalPeriodLabel;
       }
     } else {
@@ -445,10 +484,15 @@ els.paymentForm.addEventListener('submit', async e => {
     const editId = String(fd.get('editId') || els.paymentEditId?.value || '').trim();
     let periodId = els.paymentPeriod.value;
     if (!periodId) {
-      const period = await ensureFiscalPeriod(house, els.paymentDate.value || today);
+      const { period } = await ensureFiscalPeriod(house, els.paymentDate.value || today);
       periodId = period.id;
     }
-    const payment = createLocalPayment(fd, periodId);
+    const installmentKey = String(fd.get('installmentKey') || els.paymentInstallment?.value || '').trim();
+    if (!installmentKey) {
+      alert('Seleziona la rata da associare al versamento.');
+      return;
+    }
+    const payment = createLocalPayment(fd, periodId, installmentKey);
     if (editId) {
       payment.id = editId;
       const existing = house.payments.find(p => p.id === editId);
@@ -479,8 +523,36 @@ els.paymentFormCancel?.addEventListener('click', () => {
 
 els.paymentDate?.addEventListener('change', () => {
   const house = activeHouse();
-  if (house && !els.paymentEditId?.value) syncPaymentPeriodSelect(house);
+  if (house && !els.paymentEditId?.value) {
+    syncPaymentPeriodSelect(house);
+    syncPaymentInstallmentSelect(house);
+  }
 });
+
+async function offerCarryoverDue(house, newPeriodId) {
+  const suggestion = suggestCarryover(house, newPeriodId);
+  if (!suggestion) return;
+  const eccedenza = suggestion.consuntivoBalance > 0;
+  const msg = `Consuntivo ${suggestion.fromLabel}: saldo ${fmt(suggestion.consuntivoBalance)} (${eccedenza ? 'eccedenza' : 'debito'}).\n\nInserire sul preventivo ${periodLabel(house, newPeriodId)} una voce di ${fmt(suggestion.suggestedDueAmount)} per riportare il saldo consuntivo?`;
+  if (!confirm(msg)) return;
+  const due = {
+    id: uid('due'),
+    fiscalPeriodId: newPeriodId,
+    amount: suggestion.suggestedDueAmount,
+    description: `Riporto saldo consuntivo da ${suggestion.fromLabel}`,
+    dueKind: 'preventivo',
+    splitMode: 'monthly',
+    splitCustom: null,
+    carryFromPeriodId: suggestion.fromPeriodId
+  };
+  try {
+    await saveDueToSupabase(house, due);
+    await loadFromSupabase();
+    render();
+  } catch (err) {
+    alert(err.message);
+  }
+}
 
 els.duesTable?.addEventListener('click', handleRecordAction);
 els.paymentsTable?.addEventListener('click', handleRecordAction);

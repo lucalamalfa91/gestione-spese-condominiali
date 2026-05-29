@@ -1,5 +1,18 @@
 import { pad2, toIsoDate, today } from './utils.js';
 
+export const DUE_KINDS = {
+  preventivo: { label: 'Preventivo', short: 'Prev.' },
+  consuntivo: { label: 'Consuntivo', short: 'Cons.' }
+};
+
+export function isPreventivoDue(due) {
+  return (due.dueKind || 'preventivo') === 'preventivo';
+}
+
+export function isConsuntivoDue(due) {
+  return due.dueKind === 'consuntivo';
+}
+
 export function fiscalLabel(startYear, startMonth) {
   if (startMonth === 1) return String(startYear);
   return `${startYear}/${startYear + 1}`;
@@ -35,38 +48,117 @@ export function periodLabel(house, periodId) {
   return p?.label || '—';
 }
 
+function emptyPeriodRow(p) {
+  return {
+    id: p.id,
+    label: p.label,
+    startDate: p.startDate,
+    endDate: p.endDate,
+    preventivo: 0,
+    consuntivo: 0,
+    due: 0,
+    paid: 0,
+    balanceConsuntivo: 0,
+    balancePreventivo: 0,
+    balance: 0
+  };
+}
+
 export function periodSummary(house) {
   const map = new Map();
   for (const p of house.fiscalPeriods) {
-    map.set(p.id, { id: p.id, label: p.label, startDate: p.startDate, endDate: p.endDate, due: 0, paid: 0 });
+    map.set(p.id, emptyPeriodRow(p));
   }
   for (const item of house.dues) {
-    const c = map.get(item.fiscalPeriodId) || { id: item.fiscalPeriodId, label: periodLabel(house, item.fiscalPeriodId), due: 0, paid: 0 };
-    c.due += Number(item.amount || 0);
+    const c = map.get(item.fiscalPeriodId) || {
+      id: item.fiscalPeriodId,
+      label: periodLabel(house, item.fiscalPeriodId),
+      preventivo: 0,
+      consuntivo: 0,
+      due: 0,
+      paid: 0
+    };
+    const amount = Number(item.amount || 0);
+    if (isConsuntivoDue(item)) c.consuntivo += amount;
+    else c.preventivo += amount;
+    c.due += amount;
     map.set(item.fiscalPeriodId, c);
   }
   for (const item of house.payments) {
-    const c = map.get(item.fiscalPeriodId) || { id: item.fiscalPeriodId, label: periodLabel(house, item.fiscalPeriodId), due: 0, paid: 0 };
+    const c = map.get(item.fiscalPeriodId) || {
+      id: item.fiscalPeriodId,
+      label: periodLabel(house, item.fiscalPeriodId),
+      preventivo: 0,
+      consuntivo: 0,
+      due: 0,
+      paid: 0
+    };
     c.paid += Number(item.amount || 0);
     map.set(item.fiscalPeriodId, c);
   }
   return [...map.values()]
-    .map(item => ({ ...item, balance: item.paid - item.due }))
+    .map(item => {
+      const balanceConsuntivo = item.paid - item.consuntivo;
+      const balancePreventivo = item.paid - item.preventivo;
+      return {
+        ...item,
+        balanceConsuntivo,
+        balancePreventivo,
+        balance: balanceConsuntivo
+      };
+    })
     .sort((a, b) => String(b.startDate || b.label).localeCompare(String(a.startDate || a.label)));
 }
 
-export function totals(house) {
-  const due = house.dues.reduce((s, d) => s + Number(d.amount || 0), 0);
-  const paid = house.payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-  const balance = paid - due;
-  const periods = periodSummary(house);
+export function sumConsuntivoDue(house, periodId) {
+  return house.dues
+    .filter(d => d.fiscalPeriodId === periodId && isConsuntivoDue(d))
+    .reduce((s, d) => s + Number(d.amount || 0), 0);
+}
+
+export function sumPreventivoDue(house, periodId) {
+  return house.dues
+    .filter(d => d.fiscalPeriodId === periodId && isPreventivoDue(d))
+    .reduce((s, d) => s + Number(d.amount || 0), 0);
+}
+
+export function sumPaid(house, periodId) {
+  return house.payments
+    .filter(p => p.fiscalPeriodId === periodId)
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
+}
+
+/** Saldo consuntivo = versato − consuntivo (eccedenza se positivo). Null se non c’è consuntivo. */
+export function consuntivoBalance(house, periodId) {
+  const consuntivo = sumConsuntivoDue(house, periodId);
+  if (consuntivo === 0) return null;
+  return sumPaid(house, periodId) - consuntivo;
+}
+
+export function totals(house, periodId = null) {
+  const dues = periodId ? house.dues.filter(d => d.fiscalPeriodId === periodId) : house.dues;
+  const payments = periodId ? house.payments.filter(p => p.fiscalPeriodId === periodId) : house.payments;
+  const preventivo = dues.filter(isPreventivoDue).reduce((s, d) => s + Number(d.amount || 0), 0);
+  const consuntivo = dues.filter(isConsuntivoDue).reduce((s, d) => s + Number(d.amount || 0), 0);
+  const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+  const balanceConsuntivo = paid - consuntivo;
+  const balancePreventivo = paid - preventivo;
+  const periods = periodId
+    ? periodSummary(house).filter(p => p.id === periodId)
+    : periodSummary(house);
   return {
-    due,
+    preventivo,
+    consuntivo,
+    due: preventivo + consuntivo,
     paid,
-    balance,
-    debtYears: periods.filter(y => y.balance < 0).length,
-    creditYears: periods.filter(y => y.balance > 0).length,
-    years: periods.length
+    balance: balanceConsuntivo,
+    balanceConsuntivo,
+    balancePreventivo,
+    debtYears: periods.filter(y => y.balanceConsuntivo < 0).length,
+    creditYears: periods.filter(y => y.balanceConsuntivo > 0).length,
+    years: periodId ? (periods.length ? 1 : 0) : periods.length,
+    dueCount: dues.length,
+    paymentCount: payments.length
   };
 }
 

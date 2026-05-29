@@ -1,0 +1,17 @@
+<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:var(--color-surface)}
+  .nav-list{display:grid;gap:.75rem;max-width:240px}
+  .nav-btn{display:flex;align-items:center;gap:.75rem;text-align:left;padding:.75rem .85rem;background:transparent;border:1px solid transparent;border-radius:var(--radius-lg);width:100%}
+  .nav-btn.active{background:var(--color-primary-highlight);border-color:color-mix(in srgb,var(--color-primary) 28%,transparent)}
+  .nav-icon{width:36px;height:36px;border-radius:var(--radius-md);display:grid;place-items:center;color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 8%,transparent);flex-shrink:0}
+  .nav-label{display:grid;gap:.1rem}
+  .nav-label strong{font-size:14px;color:var(--color-text)}
+  .nav-label span{font-size:12px;color:var(--color-text-muted)}
+  svg{width:20px;height:20px}
+</style></head><body>
+<div class="nav-list">
+  <button class="nav-btn active"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span><span class="nav-label"><strong>Panoramica</strong><span>Riepilogo</span></span></button>
+  <button class="nav-btn"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span><span class="nav-label"><strong>Movimenti</strong><span>Dovuti e versamenti</span></span></button>
+</div>
+</body></html>

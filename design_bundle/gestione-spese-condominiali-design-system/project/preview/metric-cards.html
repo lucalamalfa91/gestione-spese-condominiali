@@ -1,0 +1,15 @@
+<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:var(--color-bg)}
+  .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .card{background:var(--color-surface);border:1px solid rgba(0,0,0,.08);border-radius:var(--radius-xl);box-shadow:var(--shadow-sm);padding:1.25rem}
+  .metric-label{color:var(--color-text-muted);font-size:14px;margin-bottom:.45rem}
+  .metric-value{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums lining-nums;line-height:1}
+  .metric-foot{margin-top:.5rem;font-size:13px;color:var(--color-text-muted)}
+  .positive{color:var(--color-success)} .negative{color:var(--color-error)}
+</style></head><body>
+<div class="cards">
+  <div class="card"><div class="metric-label">Totale dovuto</div><div class="metric-value">1.240,00 €</div><div class="metric-foot">3 registrazioni</div></div>
+  <div class="card"><div class="metric-label">Saldo complessivo</div><div class="metric-value positive">+259,50 €</div><div class="metric-foot">Sei in eccedenza</div></div>
+</div>
+</body></html>

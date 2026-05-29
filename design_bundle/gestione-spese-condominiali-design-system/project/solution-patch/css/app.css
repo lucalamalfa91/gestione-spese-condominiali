@@ -133,28 +133,6 @@
     .btn[disabled] { opacity: .65; cursor: not-allowed; transform: none; }
     .user-chip { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: .45rem .85rem; border-radius: var(--radius-full); background: var(--color-surface-offset); border: 1px solid rgba(0,0,0,.08); font-size: var(--text-sm); max-width: 240px; }
     .user-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .versamenti-layout { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: var(--space-6); align-items: start; }
-    .versamenti-form-pane { position: sticky; top: var(--space-4); align-self: start; }
-    .versamenti-list-pane { min-width: 0; display: flex; flex-direction: column; gap: var(--space-4); }
-    .versamenti-table-scroll { max-height: min(70vh, 720px); overflow: auto; }
-    .payments-summary { padding: .65rem .85rem; border-radius: var(--radius-md); background: var(--color-surface-offset); font-size: var(--text-sm); }
-    .payments-toolbar { margin-bottom: 0; }
-    .dashboard-payments-panel { margin-top: var(--space-6); }
-    .dashboard-payments-scroll { max-height: min(50vh, 480px); overflow: auto; }
-    .situazione-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
-    .situazione-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-5); }
-    .situazione-summary .metric-chip { padding: .75rem .9rem; border-radius: var(--radius-md); background: var(--color-surface-offset); border: 1px solid var(--color-divider); }
-    .situazione-summary .metric-chip strong { display: block; font-size: var(--text-lg); margin-top: .25rem; }
-    .situazione-sections { gap: var(--space-6); }
-    .situazione-section-title { font-size: var(--text-sm); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--color-text-muted); margin: 0 0 var(--space-3); }
-    .situazione-section .table-scroll { max-height: min(50vh, 420px); }
-    tr.situazione-consuntivo-row td { background: color-mix(in srgb, var(--color-surface-offset) 80%, transparent); font-weight: 600; }
-    tr.situazione-pay-row td { font-size: var(--text-sm); }
-    .amount.negative { color: var(--color-error); }
-    @media (max-width: 1100px) {
-      .versamenti-layout { grid-template-columns: 1fr; }
-      .versamenti-form-pane { position: static; }
-    }
     @media (max-width: 1100px) { .cards, .forms, .grid-2, .kpi-inline, .house-manage-layout { grid-template-columns: 1fr 1fr; } }
     @media (max-width: 860px) {
       .dashboard { grid-template-columns: 1fr; grid-template-rows: var(--header-h) 1fr; }

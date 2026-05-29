@@ -19,12 +19,19 @@ export function exportBackup(data) {
         amount: d.amount,
         description: d.description || '',
         date: d.date || null,
+        splitMode: d.splitMode || 'monthly',
+        splitCustom: d.splitCustom || null,
+        dueKind: d.dueKind || 'preventivo',
+        carryFromPeriodId: d.carryFromPeriodId || null,
         fiscalPeriodLabel: resolvePeriodLabel(house, d.fiscalPeriodId)
       })),
       payments: (house.payments || []).map(p => ({
         amount: p.amount,
         date: p.date || '',
         method: p.method || '',
+        installmentKey: p.installmentKey || null,
+        carryFromPeriodId: p.carryFromPeriodId || null,
+        isCarryForward: Boolean(p.isCarryForward),
         fiscalPeriodLabel: resolvePeriodLabel(house, p.fiscalPeriodId)
       }))
     }))
@@ -39,8 +46,33 @@ function resolvePeriodLabel(house, periodId) {
 export function parseBackup(raw) {
   if (!raw || typeof raw !== 'object') throw new Error('Formato backup non valido');
   if (raw.schemaVersion === JSON_SCHEMA_VERSION) return raw;
+  if (raw.schemaVersion === 2) return migrateV2ToV3(raw);
   if (!raw.schemaVersion && Array.isArray(raw.houses)) return migrateLegacyV1(raw);
   throw new Error(`Versione backup non supportata: ${raw.schemaVersion ?? 'sconosciuta'}`);
+}
+
+function migrateV2ToV3(raw) {
+  return {
+    ...raw,
+    schemaVersion: JSON_SCHEMA_VERSION,
+    migratedFrom: 'v2',
+    houses: (raw.houses || []).map(h => ({
+      ...h,
+      dues: (h.dues || []).map(d => ({
+        ...d,
+        splitMode: d.splitMode || 'monthly',
+        splitCustom: d.splitCustom ?? null,
+        dueKind: d.dueKind || 'preventivo',
+        carryFromPeriodId: d.carryFromPeriodId ?? null
+      })),
+      payments: (h.payments || []).map(p => ({
+        ...p,
+        installmentKey: p.installmentKey ?? null,
+        carryFromPeriodId: p.carryFromPeriodId ?? null,
+        isCarryForward: Boolean(p.isCarryForward)
+      }))
+    }))
+  };
 }
 
 function migrateLegacyV1(raw) {

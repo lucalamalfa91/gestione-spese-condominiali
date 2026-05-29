@@ -1,0 +1,17 @@
+<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:var(--color-bg)}
+  .row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .sw{border-radius:var(--radius-lg);overflow:hidden;border:1px solid rgba(0,0,0,.08);background:var(--color-surface)}
+  .chip{height:64px}
+  .meta{padding:8px 10px}
+  .name{font-size:13px;font-weight:700;color:var(--color-text)}
+  .hex{font-size:12px;color:var(--color-text-muted);font-variant-numeric:tabular-nums}
+</style></head><body>
+<div class="row">
+  <div class="sw"><div class="chip" style="background:#f7f6f2"></div><div class="meta"><div class="name">bg</div><div class="hex">#f7f6f2</div></div></div>
+  <div class="sw"><div class="chip" style="background:#f9f8f5"></div><div class="meta"><div class="name">surface</div><div class="hex">#f9f8f5</div></div></div>
+  <div class="sw"><div class="chip" style="background:#fbfbf9"></div><div class="meta"><div class="name">surface-2</div><div class="hex">#fbfbf9</div></div></div>
+  <div class="sw"><div class="chip" style="background:#f3f0ec"></div><div class="meta"><div class="name">surface-offset</div><div class="hex">#f3f0ec</div></div></div>
+</div>
+</body></html>

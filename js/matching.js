@@ -22,7 +22,7 @@ export function scoreMovement(house, movement) {
   const period = findPeriodByDate(house, movement.movementDate);
   const summaries = periodSummary(house);
   const periodSummaryRow = summaries.find(s => s.id === period.id || s.label === period.label);
-  const expectedDue = periodSummaryRow?.due ?? 0;
+  const expectedDue = periodSummaryRow?.preventivo ?? periodSummaryRow?.due ?? 0;
   const payAmount = movement.paymentAmount;
 
   let score = 0;
