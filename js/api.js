@@ -422,6 +422,7 @@ export function createLocalDue(formData) {
 }
 
 export function createLocalPayment(formData, fiscalPeriodId, installmentKey) {
+  const carryFrom = String(formData.get('carryFromPeriodId') || '').trim() || null;
   return {
     id: uid('pay'),
     fiscalPeriodId: fiscalPeriodId || null,
@@ -429,8 +430,8 @@ export function createLocalPayment(formData, fiscalPeriodId, installmentKey) {
     amount: Number(formData.get('amount')),
     date: String(formData.get('date') || today),
     method: String(formData.get('method') || '').trim(),
-    isCarryForward: false,
-    carryFromPeriodId: null
+    isCarryForward: Boolean(carryFrom),
+    carryFromPeriodId: carryFrom
   };
 }
 

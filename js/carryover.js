@@ -1,22 +1,11 @@
-import { consuntivoBalance, periodLabel } from './fiscal.js';
+import {
+  consuntivoBalance,
+  effectiveConsuntivoBalance,
+  getNextPeriod,
+  getPreviousPeriod
+} from './fiscal.js';
 
-export function getPreviousPeriod(house, periodId) {
-  const sorted = [...house.fiscalPeriods].sort((a, b) =>
-    String(a.startDate).localeCompare(String(b.startDate))
-  );
-  const idx = sorted.findIndex(p => p.id === periodId);
-  if (idx <= 0) return null;
-  return sorted[idx - 1];
-}
-
-export function getNextPeriod(house, periodId) {
-  const sorted = [...house.fiscalPeriods].sort((a, b) =>
-    String(a.startDate).localeCompare(String(b.startDate))
-  );
-  const idx = sorted.findIndex(p => p.id === periodId);
-  if (idx < 0 || idx >= sorted.length - 1) return null;
-  return sorted[idx + 1];
-}
+export { getNextPeriod, getPreviousPeriod };
 
 export function hasCarryDueForPeriod(house, toPeriodId, fromPeriodId) {
   return house.dues.some(d =>
@@ -36,15 +25,17 @@ export function suggestCarryover(house, newPeriodId) {
   const nextOfPrev = getNextPeriod(house, prev.id);
   if (!nextOfPrev || nextOfPrev.id !== newPeriodId) return null;
 
-  const balance = consuntivoBalance(house, prev.id);
-  if (balance === null || Math.abs(balance) < 0.005) return null;
+  const rawBalance = consuntivoBalance(house, prev.id);
+  const outstanding = effectiveConsuntivoBalance(house, prev.id);
+  if (rawBalance === null || outstanding === null || Math.abs(outstanding) < 0.005) return null;
   if (hasCarryDueForPeriod(house, newPeriodId, prev.id)) return null;
 
   return {
     fromPeriodId: prev.id,
     fromLabel: prev.label,
-    consuntivoBalance: balance,
+    consuntivoBalance: outstanding,
+    consuntivoBalanceRaw: rawBalance,
     /** Voce preventivo: negativa se eccedenza, positiva se debito da recuperare */
-    suggestedDueAmount: -balance
+    suggestedDueAmount: -outstanding
   };
 }

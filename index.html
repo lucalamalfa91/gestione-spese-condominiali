@@ -194,6 +194,7 @@
                   <div><label for="paymentDate">Data versamento</label><input id="paymentDate" name="date" type="date" /></div>
                 </div>
                 <div><label for="paymentMethod">Metodo</label><input id="paymentMethod" name="method" type="text" placeholder="Bonifico, contanti..." /></div>
+                <div><label for="paymentCarryFrom">Saldare consuntivo di</label><select id="paymentCarryFrom" name="carryFromPeriodId"><option value="">— Nessuno (versamento ordinario) —</option></select><p class="hint">Se il pagamento chiude il debito consuntivo dell'esercizio precedente, selezionalo qui.</p></div>
                 <input id="paymentEditId" name="editId" type="hidden" />
                 <div class="form-actions">
                   <button class="btn btn-primary" id="paymentSubmitBtn" type="submit">Salva versamento</button>

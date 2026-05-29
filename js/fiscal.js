@@ -48,6 +48,90 @@ export function periodLabel(house, periodId) {
   return p?.label || '—';
 }
 
+export function getPreviousPeriod(house, periodId) {
+  const sorted = [...house.fiscalPeriods].sort((a, b) =>
+    String(a.startDate).localeCompare(String(b.startDate))
+  );
+  const idx = sorted.findIndex(p => String(p.id) === String(periodId));
+  if (idx <= 0) return null;
+  return sorted[idx - 1];
+}
+
+export function getNextPeriod(house, periodId) {
+  const sorted = [...house.fiscalPeriods].sort((a, b) =>
+    String(a.startDate).localeCompare(String(b.startDate))
+  );
+  const idx = sorted.findIndex(p => String(p.id) === String(periodId));
+  if (idx < 0 || idx >= sorted.length - 1) return null;
+  return sorted[idx + 1];
+}
+
+/** Versamenti nell'esercizio successivo che saldano il consuntivo di periodId. */
+export function sumConsuntivoSettlementFromNextPeriod(house, periodId) {
+  const next = getNextPeriod(house, periodId);
+  if (!next) return 0;
+
+  const used = new Set();
+  let sum = 0;
+
+  for (const p of house.payments) {
+    if (String(p.fiscalPeriodId) !== String(next.id)) continue;
+    if (!p.carryFromPeriodId || String(p.carryFromPeriodId) !== String(periodId)) continue;
+    used.add(p.id);
+    sum += Number(p.amount || 0);
+  }
+
+  const carryDue = house.dues.find(d =>
+    String(d.fiscalPeriodId) === String(next.id) &&
+    d.carryFromPeriodId &&
+    String(d.carryFromPeriodId) === String(periodId)
+  );
+  if (carryDue) {
+    const prefix = `${carryDue.id}:`;
+    for (const p of house.payments) {
+      if (used.has(p.id)) continue;
+      if (String(p.fiscalPeriodId) !== String(next.id)) continue;
+      const key = p.installmentKey || '';
+      if (!key.startsWith(prefix)) continue;
+      used.add(p.id);
+      sum += Number(p.amount || 0);
+    }
+  }
+
+  return sum;
+}
+
+export function applyConsuntivoSettlement(rawBalance, settlement) {
+  if (rawBalance === null || Math.abs(rawBalance) < 0.005) {
+    return { balance: rawBalance ?? 0, settlementApplied: 0, settled: false };
+  }
+  let applied = settlement;
+  if (rawBalance < 0) applied = Math.min(Math.max(0, settlement), -rawBalance);
+  else applied = Math.max(Math.min(0, settlement), -rawBalance);
+  let balance = rawBalance + applied;
+  if (rawBalance < 0) balance = Math.min(0, balance);
+  else balance = Math.max(0, balance);
+  const settled = Math.abs(applied) > 0.005 && Math.abs(balance) < 0.005;
+  return { balance, settlementApplied: applied, settled };
+}
+
+export function effectiveConsuntivoBalance(house, periodId) {
+  const raw = consuntivoBalance(house, periodId);
+  if (raw === null) return null;
+  const settlement = sumConsuntivoSettlementFromNextPeriod(house, periodId);
+  return applyConsuntivoSettlement(raw, settlement).balance;
+}
+
+export function consuntivoBalanceFootnote(house, periodRow) {
+  if (!periodRow || !periodRow.consuntivo) return '';
+  if (periodRow.consuntivoSettledInNext) {
+    const next = getNextPeriod(house, periodRow.id);
+    return next ? `Saldato in ${next.label}` : 'Saldato nell\'esercizio successivo';
+  }
+  if (periodRow.balanceConsuntivo >= 0) return 'Eccedenza su consuntivo';
+  return 'Debito su consuntivo';
+}
+
 function emptyPeriodRow(p) {
   return {
     id: p.id,
@@ -98,10 +182,16 @@ export function periodSummary(house) {
   }
   return [...map.values()]
     .map(item => {
-      const balanceConsuntivo = item.paid - item.consuntivo;
+      const balanceConsuntivoRaw = item.paid - item.consuntivo;
+      const settlementFromNext = sumConsuntivoSettlementFromNextPeriod(house, item.id);
+      const { balance: balanceConsuntivo, settled: consuntivoSettledInNext } =
+        applyConsuntivoSettlement(balanceConsuntivoRaw, settlementFromNext);
       const balancePreventivo = item.paid - item.preventivo;
       return {
         ...item,
+        balanceConsuntivoRaw,
+        settlementFromNext,
+        consuntivoSettledInNext,
         balanceConsuntivo,
         balancePreventivo,
         balance: balanceConsuntivo
@@ -152,11 +242,13 @@ export function totals(house, periodId = null) {
   const preventivo = dues.filter(isPreventivoDue).reduce((s, d) => s + Number(d.amount || 0), 0);
   const consuntivo = dues.filter(isConsuntivoDue).reduce((s, d) => s + Number(d.amount || 0), 0);
   const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-  const balanceConsuntivo = paid - consuntivo;
-  const balancePreventivo = paid - preventivo;
   const periods = periodId
     ? periodSummary(house).filter(p => p.id === periodId)
     : periodSummary(house);
+  const balanceConsuntivo = periods.reduce((s, p) => s + p.balanceConsuntivo, 0);
+  const balancePreventivo = periodId
+    ? paid - preventivo
+    : periods.reduce((s, p) => s + p.balancePreventivo, 0);
   return {
     preventivo,
     consuntivo,
@@ -165,8 +257,8 @@ export function totals(house, periodId = null) {
     balance: balanceConsuntivo,
     balanceConsuntivo,
     balancePreventivo,
-    debtYears: periods.filter(y => y.balanceConsuntivo < 0).length,
-    creditYears: periods.filter(y => y.balanceConsuntivo > 0).length,
+    debtYears: periods.filter(y => y.balanceConsuntivo < -0.005).length,
+    creditYears: periods.filter(y => y.balanceConsuntivo > 0.005).length,
     years: periodId ? (periods.length ? 1 : 0) : periods.length,
     dueCount: dues.length,
     paymentCount: payments.length

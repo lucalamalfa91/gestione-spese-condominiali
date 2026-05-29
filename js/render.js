@@ -1,5 +1,13 @@
 import { resolveView, viewHeading, viewMeta } from './config.js';
-import { DUE_KINDS, periodLabel, periodSummary, totals, findPeriodByDate, defaultFiscalLabel } from './fiscal.js';
+import {
+  DUE_KINDS,
+  consuntivoBalanceFootnote,
+  periodLabel,
+  periodSummary,
+  totals,
+  findPeriodByDate,
+  defaultFiscalLabel
+} from './fiscal.js';
 import {
   SPLIT_MODES,
   filterPaymentsByInstallmentPeriod,
@@ -159,6 +167,22 @@ export function createRenderer(els) {
     ).join('');
   }
 
+  function syncPaymentCarryFromSelect(house) {
+    if (!els.paymentCarryFrom) return;
+    const paymentPeriodId = els.paymentPeriod?.value || '';
+    const current = els.paymentCarryFrom.value || '';
+    const sorted = [...house.fiscalPeriods].sort((a, b) =>
+      String(a.startDate).localeCompare(String(b.startDate))
+    );
+    const paymentIdx = sorted.findIndex(p => String(p.id) === String(paymentPeriodId));
+    const candidates = paymentIdx > 0 ? sorted.slice(0, paymentIdx) : sorted.filter(p => String(p.id) !== String(paymentPeriodId));
+    const opts = candidates.map(p =>
+      `<option value="${p.id}" ${p.id === current ? 'selected' : ''}>${p.label}</option>`
+    ).join('');
+    els.paymentCarryFrom.innerHTML = '<option value="">— Nessuno (versamento ordinario) —</option>' + opts;
+    if (current && candidates.some(p => p.id === current)) els.paymentCarryFrom.value = current;
+  }
+
   function syncPaymentPeriodSelect(house) {
     if (!els.paymentDate || !els.paymentPeriod) return;
     const date = els.paymentDate.value || today;
@@ -172,6 +196,7 @@ export function createRenderer(els) {
     els.paymentPeriod.innerHTML = html;
     if (existingId) els.paymentPeriod.value = existingId;
     syncPaymentInstallmentSelect(house);
+    syncPaymentCarryFromSelect(house);
   }
 
   function syncPaymentInstallmentSelect(house, preferredKey = null) {
@@ -260,11 +285,15 @@ export function createRenderer(els) {
     const periodId = activePeriodFilterId();
     const t = totals(house, periodId);
     const scope = periodId ? periodLabel(house, periodId) : 'Tutti gli esercizi';
+    const periodRow = periodId ? periodSummary(house).find(p => p.id === periodId) : null;
+    const consFoot = periodRow
+      ? consuntivoBalanceFootnote(house, periodRow)
+      : (t.debtYears ? `${t.debtYears} esercizi in debito (non saldati)` : 'Nessun debito consuntivo aperto');
     const metricData = [
       ['Preventivo', fmt(t.preventivo), scope],
       ['Consuntivo', fmt(t.consuntivo), periodId ? 'Addebiti consuntivi' : `${t.dueCount} voci dovuto`],
       ['Versato', fmt(t.paid), `${t.paymentCount} versamenti`],
-      ['Saldo consuntivo', fmt(t.balanceConsuntivo), t.balanceConsuntivo >= 0 ? 'Eccedenza su consuntivo' : 'Debito su consuntivo', t.balanceConsuntivo >= 0 ? 'positive' : 'negative']
+      ['Saldo consuntivo', fmt(t.balanceConsuntivo), consFoot, t.balanceConsuntivo >= 0 ? 'positive' : 'negative']
     ];
     els.metrics.innerHTML = metricData.map(([label, value, foot, status]) =>
       `<article class="card"><div class="metric-label">${label}</div><div class="metric-value ${status || ''}">${value}</div><div class="metric-foot">${foot}</div></article>`
@@ -288,16 +317,20 @@ export function createRenderer(els) {
     } else {
       els.annualTableWrap.innerHTML = `<table><thead><tr><th>Esercizio</th><th>Preventivo</th><th>Consuntivo</th><th>Versato</th><th>Saldo cons.</th><th>Stato</th></tr></thead><tbody>${filtered.map(item => {
         const b = item.balanceConsuntivo;
-        const status = b > 0 ? ['Eccedenza', 'success'] : b < 0 ? ['In debito', 'error'] : ['Pareggio', 'warn'];
-        return `<tr><td>${item.label}<div class="hint">${item.startDate || ''} → ${item.endDate || ''}</div></td><td class="amount">${fmt(item.preventivo)}</td><td class="amount">${fmt(item.consuntivo)}</td><td class="amount">${fmt(item.paid)}</td><td class="amount ${b >= 0 ? 'positive' : 'negative'}">${fmt(b)}</td><td><span class="badge ${status[1]}">${status[0]}</span></td></tr>`;
+        const status = item.consuntivoSettledInNext
+          ? ['Saldato', 'success']
+          : b > 0.005 ? ['Eccedenza', 'success'] : b < -0.005 ? ['In debito', 'error'] : ['Pareggio', 'warn'];
+        const saldoHint = item.consuntivoSettledInNext && Math.abs(item.balanceConsuntivoRaw - b) > 0.005
+          ? `<div class="hint">Lordo ${fmt(item.balanceConsuntivoRaw)}</div>` : '';
+        return `<tr><td>${item.label}<div class="hint">${item.startDate || ''} → ${item.endDate || ''}</div></td><td class="amount">${fmt(item.preventivo)}</td><td class="amount">${fmt(item.consuntivo)}</td><td class="amount">${fmt(item.paid)}</td><td class="amount ${b >= 0 ? 'positive' : 'negative'}">${fmt(b)}${saldoHint}</td><td><span class="badge ${status[1]}">${status[0]}</span></td></tr>`;
       }).join('')}</tbody></table>`;
     }
     const cardsSource = els.periodFilter.value === 'all' ? summary : filtered;
     const cards = cardsSource.length
       ? `<div class="annual-list">${cardsSource.map(item => {
         const b = item.balanceConsuntivo;
-        const cls = b > 0 ? 'success' : b < 0 ? 'error' : 'warn';
-        const label = b > 0 ? 'Eccedenza' : b < 0 ? 'Debito' : 'Pareggio';
+        const cls = item.consuntivoSettledInNext ? 'success' : b > 0.005 ? 'success' : b < -0.005 ? 'error' : 'warn';
+        const label = item.consuntivoSettledInNext ? 'Saldato' : b > 0.005 ? 'Eccedenza' : b < -0.005 ? 'Debito' : 'Pareggio';
         return `<div class="annual-item"><div><strong>${item.label}</strong><div class="hint">Prev. ${fmt(item.preventivo)} · Cons. ${fmt(item.consuntivo)} · Vers. ${fmt(item.paid)}</div></div><div><span class="badge ${cls}">${label}</span></div><strong class="${b >= 0 ? 'positive' : 'negative'}">${fmt(b)}</strong></div>`;
       }).join('')}</div>`
       : '<div class="empty">Nessuna annualità registrata.</div>';
@@ -333,7 +366,9 @@ export function createRenderer(els) {
     const amtCls = amt >= 0 ? 'positive' : 'negative';
     const carry = item.isCarryForward ? ' <span class="badge warn">Riporto</span>' : '';
     const rataCell = inferred ? `${rata} <span class="hint">(stimata)</span>` : rata;
-    return `<tr><td>${periodLabel(house, item.fiscalPeriodId)}</td><td>${rataCell}${carry}</td><td>${item.date || '—'}</td><td>${item.method || '—'}</td><td class="amount ${amtCls}">${fmt(amt)}</td><td>${rowActions('payment', item.id)}</td></tr>`;
+    const settle = item.carryFromPeriodId
+      ? ` <span class="badge success">Saldo ${periodLabel(house, item.carryFromPeriodId)}</span>` : '';
+    return `<tr><td>${periodLabel(house, item.fiscalPeriodId)}</td><td>${rataCell}${carry}${settle}</td><td>${item.date || '—'}</td><td>${item.method || '—'}</td><td class="amount ${amtCls}">${fmt(amt)}</td><td>${rowActions('payment', item.id)}</td></tr>`;
   }
 
   function renderPayments(house) {
@@ -376,14 +411,19 @@ export function createRenderer(els) {
     }).join('')}</tbody></table>`;
   }
 
-  function renderSituazioneSummaryChips(totalsRow, report) {
-    const cons = situazioneStatusLabel(totalsRow?.balanceConsuntivo ?? 0);
-    const prev = situazioneStatusLabel(totalsRow?.balancePreventivo ?? 0);
+  function renderSituazioneSummaryChips(house, totalsRow, report) {
+    const consBal = totalsRow?.balanceConsuntivo ?? 0;
+    const cons = totalsRow?.consuntivoSettledInNext
+      ? { text: consuntivoBalanceFootnote(house, totalsRow), cls: 'success' }
+      : situazioneStatusLabel(consBal);
+    const consFoot = totalsRow?.consuntivoSettledInNext && Math.abs((totalsRow.balanceConsuntivoRaw ?? 0) - consBal) > 0.005
+      ? `${cons.text} (lordo ${fmt(totalsRow.balanceConsuntivoRaw)})`
+      : cons.text;
     const chips = [
       ['Preventivo', fmt(totalsRow?.preventivo ?? 0), 'Totale voci'],
       ['Consuntivo', fmt(totalsRow?.consuntivo ?? 0), 'Addebiti consuntivi'],
       ['Versato', fmt(totalsRow?.paid ?? 0), `${report.periodPayments.length} movimenti`],
-      ['Saldo consuntivo', fmt(totalsRow?.balanceConsuntivo ?? 0), cons.text, cons.cls],
+      ['Saldo consuntivo', fmt(consBal), consFoot, cons.cls],
       ['Saldo rate prev.', fmt(report.slotsBalance), 'Versato − rate', report.slotsBalance >= 0 ? 'positive' : 'negative']
     ];
     return chips.map(([label, value, foot, status]) =>
@@ -410,7 +450,9 @@ export function createRenderer(els) {
     ).join('');
     const b = totalsRow?.balanceConsuntivo ?? 0;
     const balCls = b >= 0 ? 'positive' : 'negative';
-    return `<div class="situazione-section"><h3 class="situazione-section-title">Consuntivo</h3><div class="data-table-wrap"><table><thead><tr><th>Descrizione</th><th>Importo</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th>Totale consuntivo</th><td class="amount">${fmt(report.consuntivoTotal)}</td></tr><tr><th>Saldo (versato − consuntivo)</th><td class="amount ${balCls}">${fmt(b)}</td></tr></tfoot></table></div></div>`;
+    const saldoNote = totalsRow?.consuntivoSettledInNext
+      ? `<div class="hint">${consuntivoBalanceFootnote(house, totalsRow)}</div>` : '';
+    return `<div class="situazione-section"><h3 class="situazione-section-title">Consuntivo</h3><div class="data-table-wrap"><table><thead><tr><th>Descrizione</th><th>Importo</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th>Totale consuntivo</th><td class="amount">${fmt(report.consuntivoTotal)}</td></tr><tr><th>Saldo (versato − consuntivo)</th><td class="amount ${balCls}">${fmt(b)}${saldoNote}</td></tr></tfoot></table></div></div>`;
   }
 
   function renderPeriodPaymentsSection(house, report, title = 'Versamenti esercizio') {
@@ -501,7 +543,7 @@ export function createRenderer(els) {
     }
 
     if (els.situazioneSummary) {
-      els.situazioneSummary.innerHTML = renderSituazioneSummaryChips(totalsRow, report);
+      els.situazioneSummary.innerHTML = renderSituazioneSummaryChips(house, totalsRow, report);
     }
     els.situazioneSections.innerHTML = [
       renderRateTable(report.slots),
@@ -705,6 +747,7 @@ export function createRenderer(els) {
     renderBankImportPreview,
     renderUnlinkedMovements,
     syncPaymentPeriodSelect,
+    syncPaymentCarryFromSelect,
     syncPaymentInstallmentSelect,
     syncDueKindFields,
     renderNewHouseForm
@@ -781,6 +824,7 @@ export function collectDom() {
     dueFormCancel: document.getElementById('dueFormCancel'),
     duesTable: document.getElementById('duesTable'),
     paymentPeriod: document.getElementById('paymentPeriod'),
+    paymentCarryFrom: document.getElementById('paymentCarryFrom'),
     paymentDate: document.getElementById('paymentDate'),
     paymentEditId: document.getElementById('paymentEditId'),
     paymentSubmitBtn: document.getElementById('paymentSubmitBtn'),

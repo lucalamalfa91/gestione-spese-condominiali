@@ -39,7 +39,7 @@ function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
 }
 
-const { setView, render: baseRender, syncPaymentPeriodSelect, syncPaymentInstallmentSelect, syncDueKindFields } = createRenderer(els);
+const { setView, render: baseRender, syncPaymentPeriodSelect, syncPaymentCarryFromSelect, syncPaymentInstallmentSelect, syncDueKindFields } = createRenderer(els);
 let renderedHouseId = null;
 function render(...args) {
   const house = activeHouse();
@@ -118,6 +118,10 @@ function startEditPayment(house, payment) {
   syncPaymentPeriodSelect(house);
   if (payment.fiscalPeriodId) els.paymentPeriod.value = payment.fiscalPeriodId;
   syncPaymentInstallmentSelect(house, payment.installmentKey || null);
+  syncPaymentCarryFromSelect(house);
+  if (els.paymentCarryFrom && payment.carryFromPeriodId) {
+    els.paymentCarryFrom.value = payment.carryFromPeriodId;
+  }
   navigate('movimenti', 'versamenti');
   els.paymentForm?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -352,7 +356,9 @@ els.paymentFilterYear?.addEventListener('change', () => { const h = activeHouse(
 els.paymentFilterMonth?.addEventListener('change', () => { const h = activeHouse(); if (h) render(); });
 els.paymentPeriod?.addEventListener('change', () => {
   const house = activeHouse();
-  if (house) syncPaymentInstallmentSelect(house);
+  if (!house) return;
+  syncPaymentInstallmentSelect(house);
+  syncPaymentCarryFromSelect(house);
 });
 els.situazionePeriod?.addEventListener('change', () => { const h = activeHouse(); if (h) render(); });
 els.situazionePdfBtn?.addEventListener('click', async () => {
