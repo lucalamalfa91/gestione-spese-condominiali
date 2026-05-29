@@ -11,7 +11,8 @@ export const state = {
   supabase: null,
   user: null,
   recoveryMode: false,
-  bankImportPreview: []
+  bankImportPreview: [],
+  houseFormMode: 'edit'
 };
 
 export function activeHouse() {

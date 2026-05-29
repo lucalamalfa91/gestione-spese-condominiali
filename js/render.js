@@ -48,10 +48,6 @@ export function createRenderer(els) {
   }
 
   function closeOverlays() {
-    els.houseDrawer?.classList.add('hidden');
-    els.houseDrawerBackdrop?.classList.add('hidden');
-    els.houseSwitcherBtn?.setAttribute('aria-expanded', 'false');
-    els.houseDrawerToggle?.setAttribute('aria-expanded', 'false');
     els.userMenu?.classList.add('hidden');
     els.userMenuBtn?.setAttribute('aria-expanded', 'false');
   }
@@ -74,18 +70,61 @@ export function createRenderer(els) {
     els.main?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function openHouseDrawer() {
-    els.houseDrawer?.classList.remove('hidden');
-    els.houseDrawerBackdrop?.classList.remove('hidden');
-    els.houseSwitcherBtn?.setAttribute('aria-expanded', 'true');
-    els.houseDrawerToggle?.setAttribute('aria-expanded', 'true');
+  function renderHouseSelect() {
+    if (!els.houseSelect) return;
+    if (state.houseFormMode === 'new') {
+      els.houseSelect.disabled = true;
+      els.houseSelect.innerHTML = '<option value="">Nuova casa…</option>';
+      return;
+    }
+    const current = state.selectedHouseId || '';
+    if (!state.data.houses.length) {
+      els.houseSelect.innerHTML = '<option value="">Nessun immobile</option>';
+      els.houseSelect.disabled = true;
+      return;
+    }
+    els.houseSelect.disabled = false;
+    els.houseSelect.innerHTML = state.data.houses.map(h =>
+      `<option value="${h.id}" ${h.id === current ? 'selected' : ''}>${h.name}</option>`
+    ).join('');
+    if (current) els.houseSelect.value = current;
   }
 
-  function closeHouseDrawer() {
-    els.houseDrawer?.classList.add('hidden');
-    els.houseDrawerBackdrop?.classList.add('hidden');
-    els.houseSwitcherBtn?.setAttribute('aria-expanded', 'false');
-    els.houseDrawerToggle?.setAttribute('aria-expanded', 'false');
+  function renderHousesManageList() {
+    if (!els.housesManageList) return;
+    if (!state.data.houses.length) {
+      els.housesManageList.innerHTML = '<div class="empty">Nessun immobile registrato. Usa + Nuova casa per iniziare.</div>';
+      return;
+    }
+    els.housesManageList.innerHTML = '';
+    for (const h of state.data.houses) {
+      const t = totals(h);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `house-btn ${h.id === state.selectedHouseId && state.houseFormMode === 'edit' ? 'active' : ''}`;
+      btn.dataset.houseId = h.id;
+      btn.innerHTML = `<strong>${h.name}</strong><span class="muted">${h.location || 'Località non indicata'}</span><span class="muted">Saldo: ${fmt(t.balance)}</span>`;
+      els.housesManageList.appendChild(btn);
+    }
+  }
+
+  function syncHouseFormChrome(mode) {
+    const isNew = mode === 'new';
+    if (els.houseFormTitle) els.houseFormTitle.textContent = isNew ? 'Nuova casa' : 'Modifica immobile';
+    if (els.houseFormSubtitle) {
+      els.houseFormSubtitle.textContent = isNew
+        ? 'Compila i dati e salva per aggiungere un immobile.'
+        : 'Dati e configurazione esercizio fiscale.';
+    }
+    if (els.houseSubmitBtn) els.houseSubmitBtn.textContent = isNew ? 'Crea casa' : 'Salva modifiche';
+    els.deleteHouseBtn?.classList.toggle('hidden', isNew || !state.data.houses.length);
+    els.houseForm?.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = false; });
+  }
+
+  function renderNewHouseForm() {
+    syncHouseFormChrome('new');
+    els.houseForm?.reset();
+    if (els.fiscalStartMonth) els.fiscalStartMonth.value = '6';
   }
 
   function periodOptions(house, selectedId) {
@@ -125,28 +164,8 @@ export function createRenderer(els) {
   }
 
   function renderHouseList() {
-    const house = activeHouse();
-    if (els.houseSwitcherLabel) {
-      els.houseSwitcherLabel.textContent = house?.name || 'Seleziona immobile';
-    }
-    els.houseList.innerHTML = '';
-    if (!state.data.houses.length) {
-      els.houseList.innerHTML = '<div class="empty">Nessun immobile ancora presente.<br/>Crea la prima casa per iniziare.</div>';
-      return;
-    }
-    for (const h of state.data.houses) {
-      const t = totals(h);
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `house-btn ${h.id === state.selectedHouseId ? 'active' : ''}`;
-      btn.innerHTML = `<strong>${h.name}</strong><span class="muted">${h.location || 'Località non indicata'}</span><span class="muted">Saldo: ${fmt(t.balance)}</span>`;
-      btn.addEventListener('click', () => {
-        state.selectedHouseId = h.id;
-        closeHouseDrawer();
-        render();
-      });
-      els.houseList.appendChild(btn);
-    }
+    renderHouseSelect();
+    renderHousesManageList();
   }
 
   function renderMetrics(house) {
@@ -235,21 +254,14 @@ export function createRenderer(els) {
   }
 
   function renderHouseForm(house) {
+    state.houseFormMode = 'edit';
+    syncHouseFormChrome('edit');
     els.houseForm.name.value = house.name || '';
     els.houseForm.location.value = house.location || '';
     els.houseForm.notes.value = house.notes || '';
     if (els.fiscalStartMonth) els.fiscalStartMonth.value = String(house.fiscalStartMonth || 6);
     els.currentHouseTitle.textContent = house.name;
     els.currentHouseMeta.textContent = [house.location || 'Località non indicata', house.notes || 'Nessuna nota'].join(' · ');
-    const t = totals(house);
-    els.houseSummary.innerHTML = [
-      `Immobili gestiti|${state.data.houses.length}`,
-      `Esercizi|${t.years}`,
-      `Saldo|${fmt(t.balance)}`
-    ].map(item => {
-      const [l, v] = item.split('|');
-      return `<div class="mini-card"><div class="metric-label">${l}</div><div class="metric-value" style="font-size:1.35rem;">${v}</div></div>`;
-    }).join('');
   }
 
   function renderBankImportPreview(house) {
@@ -305,24 +317,33 @@ export function createRenderer(els) {
 
   function renderEmptyState() {
     els.currentHouseTitle.textContent = 'Nessuna casa selezionata';
-    els.currentHouseMeta.textContent = 'Crea il primo immobile dal selettore in alto.';
-    els.metrics.innerHTML = '<div class="empty" style="grid-column:1 / -1;">Crea la prima casa per vedere il riepilogo.<br/><button type="button" class="btn btn-primary" id="emptyAddHouseBtn" style="margin-top:1rem;">+ Nuova casa</button></div>';
+    els.currentHouseMeta.textContent = 'Aggiungi un immobile con + casa in alto o da Impostazioni → Immobili.';
+    els.metrics.innerHTML = '<div class="empty" style="grid-column:1 / -1;">Nessun immobile registrato.<br/><button type="button" class="btn btn-primary" id="emptyAddHouseBtn" style="margin-top:1rem;">+ casa</button></div>';
     els.annualTableWrap.innerHTML = '<div class="empty">Nessuna annualità disponibile.</div>';
     els.annualCards.innerHTML = '<div class="empty">Nessun saldo disponibile.</div>';
     els.annualPageCards.innerHTML = '<div class="empty">Nessuna annualità registrata.</div>';
     els.paymentsTable.innerHTML = '<div class="empty">Nessun versamento registrato.</div>';
     if (els.duesTable) els.duesTable.innerHTML = '<div class="empty">Nessun dovuto registrato.</div>';
     els.movements.innerHTML = '<div class="empty">Nessun movimento da mostrare.</div>';
-    els.houseSummary.innerHTML = '<div class="empty" style="grid-column:1/-1;">Nessun riepilogo immobile disponibile.</div>';
-    els.houseForm.reset();
+    if (state.houseFormMode === 'new') renderNewHouseForm();
+    else {
+      els.houseForm?.reset();
+      syncHouseFormChrome('edit');
+      els.deleteHouseBtn?.classList.add('hidden');
+    }
     els.metrics.querySelector('#emptyAddHouseBtn')?.addEventListener('click', () => {
-      openHouseDrawer();
+      window.dispatchEvent(new CustomEvent('app:start-new-house'));
     });
   }
 
   function render(authRenderAccount) {
     if (!state.selectedHouseId && state.data.houses[0]) state.selectedHouseId = state.data.houses[0].id;
     renderHouseList();
+    if (state.houseFormMode === 'new') {
+      renderNewHouseForm();
+      if (state.currentView === 'impostazioni' && state.currentSubview === 'account') authRenderAccount?.();
+      return;
+    }
     const house = activeHouse();
     if (!house) { renderEmptyState(); return; }
     renderMetrics(house);
@@ -337,7 +358,7 @@ export function createRenderer(els) {
     if (state.currentView === 'impostazioni' && state.currentSubview === 'account') authRenderAccount?.();
   }
 
-  return { setView, render, renderBankImportPreview, renderUnlinkedMovements, syncPaymentPeriodSelect, openHouseDrawer, closeHouseDrawer };
+  return { setView, render, renderBankImportPreview, renderUnlinkedMovements, syncPaymentPeriodSelect, renderNewHouseForm };
 }
 
 export function collectDom() {
@@ -369,18 +390,18 @@ export function collectDom() {
     userChip: document.getElementById('userMenuBtn'),
     userMenuBtn: document.getElementById('userMenuBtn'),
     userMenu: document.getElementById('userMenu'),
-    houseSwitcherBtn: document.getElementById('houseSwitcherBtn'),
-    houseSwitcherLabel: document.getElementById('houseSwitcherLabel'),
-    houseDrawer: document.getElementById('houseDrawer'),
-    houseDrawerBackdrop: document.getElementById('houseDrawerBackdrop'),
-    houseDrawerToggle: document.getElementById('houseDrawerToggle'),
-    houseDrawerClose: document.getElementById('houseDrawerClose'),
+    houseSelect: document.getElementById('houseSelect'),
+    headerAddHouseBtn: document.getElementById('headerAddHouseBtn'),
+    housesManageList: document.getElementById('housesManageList'),
+    addHouseSettingsBtn: document.getElementById('addHouseSettingsBtn'),
+    houseFormTitle: document.getElementById('houseFormTitle'),
+    houseFormSubtitle: document.getElementById('houseFormSubtitle'),
+    houseSubmitBtn: document.getElementById('houseSubmitBtn'),
     quickAddFab: document.getElementById('quickAddFab'),
     quickAddSheet: document.getElementById('quickAddSheet'),
     quickAddBackdrop: document.getElementById('quickAddBackdrop'),
     quickAddClose: document.getElementById('quickAddClose'),
     main: document.getElementById('mainContent'),
-    houseList: document.getElementById('houseList'),
     metrics: document.getElementById('metrics'),
     annualTableWrap: document.getElementById('annualTableWrap'),
     annualCards: document.getElementById('annualCards'),
@@ -388,7 +409,6 @@ export function collectDom() {
     movements: document.getElementById('movements'),
     currentHouseTitle: document.getElementById('currentHouseTitle'),
     currentHouseMeta: document.getElementById('currentHouseMeta'),
-    addHouseBtn: document.getElementById('addHouseBtn'),
     deleteHouseBtn: document.getElementById('deleteHouseBtn'),
     periodFilter: document.getElementById('periodFilter'),
     dueForm: document.getElementById('dueForm'),
@@ -414,7 +434,6 @@ export function collectDom() {
     paymentSubmitBtn: document.getElementById('paymentSubmitBtn'),
     paymentFormCancel: document.getElementById('paymentFormCancel'),
     paymentsTable: document.getElementById('paymentsTable'),
-    houseSummary: document.getElementById('houseSummary'),
     navButtons: [...document.querySelectorAll('.nav-rail [data-view], .bottom-nav [data-view]')],
     subviewTabs: [...document.querySelectorAll('[data-subview]')],
     subviewPanels: [...document.querySelectorAll('[data-subview-panel]')],

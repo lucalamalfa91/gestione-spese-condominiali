@@ -49,7 +49,7 @@ export const viewMeta = {
     subtitle: 'Casa e account',
     defaultSubview: 'casa',
     subviews: {
-      casa: ['Immobile', 'Dati casa e fiscalità'],
+      casa: ['Gestione immobili', 'Aggiungi, modifica ed elimina case'],
       account: ['Account', 'Profilo e password']
     }
   }

@@ -34,7 +34,7 @@ function setTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
 }
 
-const { setView, render: baseRender, syncPaymentPeriodSelect, openHouseDrawer, closeHouseDrawer } = createRenderer(els);
+const { setView, render: baseRender, syncPaymentPeriodSelect } = createRenderer(els);
 let renderedHouseId = null;
 function render(...args) {
   const house = activeHouse();
@@ -171,18 +171,37 @@ function handleRecordAction(e) {
   }
 }
 
-async function addHouse() {
+function startNewHouseForm() {
+  state.houseFormMode = 'new';
+  navigate('impostazioni', 'casa');
+  render();
+}
+
+function selectHouse(houseId) {
+  state.houseFormMode = 'edit';
+  state.selectedHouseId = houseId;
+  render();
+}
+
+async function createHouseFromForm() {
   const house = createLocalHouse();
+  house.name = els.houseForm.name.value.trim() || house.name;
+  house.location = els.houseForm.location.value.trim();
+  house.notes = els.houseForm.notes.value.trim();
+  house.fiscalStartMonth = Number(els.fiscalStartMonth?.value || 6);
   state.data.houses.push(house);
   state.selectedHouseId = house.id;
-  render();
-  navigate('impostazioni', 'casa');
+  state.houseFormMode = 'edit';
   try {
     await saveHouseToSupabase(house);
     await loadFromSupabase();
     render();
   } catch (err) {
+    state.data.houses = state.data.houses.filter(h => h.id !== house.id);
+    state.selectedHouseId = state.data.houses[0]?.id || null;
+    state.houseFormMode = state.data.houses.length ? 'edit' : 'new';
     alert(err.message || 'Errore salvataggio casa');
+    render();
   }
 }
 
@@ -274,7 +293,6 @@ function closeQuickAddSheet() {
 
 function closeAllOverlays() {
   closeQuickAddSheet();
-  closeHouseDrawer();
   els.userMenu?.classList.add('hidden');
   els.userMenuBtn?.setAttribute('aria-expanded', 'false');
 }
@@ -289,7 +307,8 @@ function wireNavigation() {
   els.subviewTabs?.forEach(tab => tab.addEventListener('click', () => navigate(tab.dataset.view, tab.dataset.subview)));
   document.querySelectorAll('[data-nav-target]').forEach(btn => {
     btn.addEventListener('click', () => {
-      navigate(btn.dataset.navTarget, btn.dataset.navSubview || null);
+      if (btn.dataset.houseMode === 'new') startNewHouseForm();
+      else navigate(btn.dataset.navTarget, btn.dataset.navSubview || null);
       if (btn.dataset.closeSheet) closeQuickAddSheet();
     });
   });
@@ -298,7 +317,17 @@ function wireNavigation() {
 els.loginForm.addEventListener('submit', auth.signIn);
 els.recoveryForm.addEventListener('submit', auth.updatePasswordFromRecovery);
 els.accountPasswordForm.addEventListener('submit', auth.updatePasswordFromAccount);
-els.addHouseBtn.addEventListener('click', addHouse);
+els.headerAddHouseBtn?.addEventListener('click', startNewHouseForm);
+els.addHouseSettingsBtn?.addEventListener('click', startNewHouseForm);
+window.addEventListener('app:start-new-house', startNewHouseForm);
+els.houseSelect?.addEventListener('change', e => {
+  if (e.target.value) selectHouse(e.target.value);
+});
+els.housesManageList?.addEventListener('click', e => {
+  const btn = e.target.closest('.house-btn[data-house-id]');
+  if (!btn) return;
+  selectHouse(btn.dataset.houseId);
+});
 els.exportBtn.addEventListener('click', exportJson);
 els.importFile.addEventListener('change', e => importJson(e.target.files[0]));
 els.demoBtn?.addEventListener('click', () => alert('Demo locale disabilitata con fiscalità Supabase.'));
@@ -308,10 +337,6 @@ wireNavigation();
 els.periodFilter.addEventListener('change', () => { const h = activeHouse(); if (h) render(); });
 els.logoutBtn.addEventListener('click', auth.logout);
 
-els.houseSwitcherBtn?.addEventListener('click', openHouseDrawer);
-els.houseDrawerToggle?.addEventListener('click', openHouseDrawer);
-els.houseDrawerClose?.addEventListener('click', closeHouseDrawer);
-els.houseDrawerBackdrop?.addEventListener('click', closeHouseDrawer);
 els.quickAddFab?.addEventListener('click', openQuickAddSheet);
 els.quickAddClose?.addEventListener('click', closeQuickAddSheet);
 els.quickAddBackdrop?.addEventListener('click', closeQuickAddSheet);
@@ -338,6 +363,10 @@ document.addEventListener('click', () => {
 
 els.houseForm.addEventListener('submit', async e => {
   e.preventDefault();
+  if (state.houseFormMode === 'new') {
+    await createHouseFromForm();
+    return;
+  }
   const house = ensureHouse();
   if (!house) return;
   house.name = els.houseForm.name.value.trim() || house.name;
@@ -360,8 +389,10 @@ els.deleteHouseBtn.addEventListener('click', async () => {
     if (state.supabase && state.user && Number.isFinite(Number(house.id))) await deleteHouseRemote(house.id);
     state.data.houses = state.data.houses.filter(h => h.id !== house.id);
     state.selectedHouseId = state.data.houses[0]?.id || null;
+    state.houseFormMode = state.data.houses.length ? 'edit' : 'new';
     render();
-    navigate('panoramica');
+    if (!state.data.houses.length) startNewHouseForm();
+    else navigate('panoramica');
   } catch (err) {
     alert(err.message);
   }

@@ -84,13 +84,11 @@
 
     <header class="header">
       <div class="topbar-left">
-        <button class="icon-btn house-drawer-toggle" id="houseDrawerToggle" type="button" aria-expanded="false" aria-controls="houseDrawer" aria-label="Seleziona immobile">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V8.5L12 4l8 4.5V20"/><path d="M8 20v-6h8v6"/></svg>
-        </button>
-        <button class="house-switcher" id="houseSwitcherBtn" type="button" aria-expanded="false" aria-controls="houseDrawer">
-          <span class="house-switcher-label" id="houseSwitcherLabel">Seleziona immobile</span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-        </button>
+        <div class="house-bar">
+          <label class="sr-only" for="houseSelect">Immobile attivo</label>
+          <select id="houseSelect" class="house-select" aria-label="Seleziona immobile"></select>
+          <button class="btn-link" id="headerAddHouseBtn" type="button">+ casa</button>
+        </div>
         <div class="header-titles">
           <div class="page-title" id="viewTitle">Panoramica</div>
           <div class="muted" id="viewSubtitle">Riepilogo della casa selezionata</div>
@@ -116,7 +114,7 @@
         <div class="hero">
           <div>
             <h2 class="page-title" id="currentHouseTitle">Nessuna casa selezionata</h2>
-            <p class="muted" id="currentHouseMeta">Crea il primo immobile dal selettore in alto.</p>
+            <p class="muted" id="currentHouseMeta">Aggiungi un immobile da Impostazioni o con + casa.</p>
           </div>
           <div class="toolbar">
             <button class="btn btn-primary" type="button" data-nav-target="movimenti" data-nav-subview="dovuti">+ Dovuto</button>
@@ -231,13 +229,20 @@
 
       <section class="view" data-view-panel="impostazioni">
         <nav class="sub-nav" role="tablist" aria-label="Sezioni impostazioni">
-          <button class="sub-nav-btn active" type="button" role="tab" data-view="impostazioni" data-subview="casa" aria-selected="true">Immobile</button>
+          <button class="sub-nav-btn active" type="button" role="tab" data-view="impostazioni" data-subview="casa" aria-selected="true">Immobili</button>
           <button class="sub-nav-btn" type="button" role="tab" data-view="impostazioni" data-subview="account" aria-selected="false">Account</button>
         </nav>
         <div class="subview active" data-subview-panel="casa" role="tabpanel">
-          <div class="forms">
+          <div class="forms house-manage-layout">
             <div class="card stack">
-              <div class="panel-head"><div><h2>Gestione immobile</h2><p class="subtle">Dati casa e configurazione esercizio fiscale.</p></div></div>
+              <div class="panel-head">
+                <div><h2>I tuoi immobili</h2><p class="subtle">Seleziona una casa da modificare o eliminare.</p></div>
+                <button class="btn btn-secondary" id="addHouseSettingsBtn" type="button">+ Nuova casa</button>
+              </div>
+              <div id="housesManageList" class="house-list compact"></div>
+            </div>
+            <div class="card stack">
+              <div class="panel-head"><div><h2 id="houseFormTitle">Modifica immobile</h2><p class="subtle" id="houseFormSubtitle">Dati e configurazione esercizio fiscale.</p></div></div>
               <form id="houseForm" class="stack">
                 <div class="field-grid">
                   <div><label for="houseName">Nome casa</label><input id="houseName" name="name" type="text" required placeholder="Appartamento Milano" /></div>
@@ -254,10 +259,12 @@
                   </div>
                 </div>
                 <div><label for="houseNotes">Note</label><textarea id="houseNotes" name="notes" placeholder="Amministratore, millesimi, appunti..."></textarea></div>
-                <button class="btn btn-secondary" type="submit">Aggiorna casa</button>
+                <div class="form-actions">
+                  <button class="btn btn-primary" id="houseSubmitBtn" type="submit">Salva modifiche</button>
+                  <button class="btn btn-danger" id="deleteHouseBtn" type="button">Elimina casa</button>
+                </div>
               </form>
             </div>
-            <div class="card stack"><div class="panel-head"><div><h2>Riepilogo immobile</h2><p class="subtle">Visione sintetica della casa selezionata.</p></div></div><div class="kpi-inline" id="houseSummary"></div><button class="btn btn-danger" id="deleteHouseBtn">Elimina casa</button></div>
           </div>
         </div>
         <div class="subview" data-subview-panel="account" role="tabpanel">
@@ -307,15 +314,6 @@
       </div>
     </div>
 
-    <div class="drawer-backdrop hidden" id="houseDrawerBackdrop"></div>
-    <aside class="house-drawer hidden" id="houseDrawer" aria-label="Immobili">
-      <div class="drawer-head">
-        <h2>Immobili</h2>
-        <button class="icon-btn drawer-close" id="houseDrawerClose" type="button" aria-label="Chiudi">×</button>
-      </div>
-      <div id="houseList" class="house-list"></div>
-      <button class="btn btn-primary" id="addHouseBtn" type="button">+ Nuova casa</button>
-    </aside>
   </div>
 
   <script type="module" src="js/main.js"></script>
